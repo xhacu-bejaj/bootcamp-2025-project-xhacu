@@ -66,10 +66,14 @@ class InMemoryStore(PromptStore):
         # This way the storage is independent of Prompt
         # I can change the Prompt class and it doesn't affect the InMemoryStore
         self._prompts: List[Prompt] 
-        self._active_prompts:List[Prompt]
+        self._active_prompts:List[Prompt] # use dict {user:prompt.name,  }
 
+    # Add checks, purpose, name, template cannot be None otherwise creation must fail
     def create(self, purpose: str, name: str, template: str) -> Prompt:
-        return Prompt(str(uuid4()), purpose, name, template)
+        new_prompt = Prompt(str(uuid4()), purpose, name, template)
+        self._prompts.append(new_prompt)
+        return new_prompt
+    
     
     def list(self, purpose: str | None = None) -> List[Prompt]:
         return [p for p in self._prompts if p.purpose == purpose]
