@@ -98,7 +98,7 @@ class InMemoryStore(PromptStore):
     
     def get_active(self, user_id: str, purpose: str) -> Prompt | None:
         prompt_dict:Dict = self._active_prompts[user_id]
-        
+        # why purpose? think about that
         return None
             
         
