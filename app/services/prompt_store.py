@@ -89,8 +89,10 @@ class InMemoryStore(PromptStore):
         return prompt
     
     def set_active(self, user_id: UserId, purpose: str, prompt_id: PromptId) -> Prompt | None:
-        active_prompt = self._active_prompts[user_id] = {prompt_id: purpose}
-        # must return a prompt, rethink this function
+        # it must be in self._prompts
+        self._active_prompts[user_id] = {prompt_id: purpose} # Add it to _active_prompts ==> prompt_id is active
+        for prompt in self._prompts:
+            # cerca il prompt e returnalo
         return 
     
     
