@@ -77,6 +77,13 @@ class InMemoryStore(PromptStore):
     def get(self, prompt_id: UUID) -> Prompt | None:
         return next((p for p in self._prompts if p.id == prompt_id), None)
     
+    def patch(self, prompt_id: str, template: str) -> Prompt | None:
+        # The prompt_id could be non-existant so add a check for that
+        for prompt in self._prompts:
+            if prompt.id == prompt_id:
+                prompt.template = template
+        return prompt
+    
     
 
 
