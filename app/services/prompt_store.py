@@ -73,7 +73,7 @@ class InMemoryStore(PromptStore):
     
     def list(self, purpose: str | None = None) -> List[Prompt]:
         # Let the option str | None so that it returns all prompts if none is specified
-        return [p for p in self._prompts if p.purpose != purpose]
+        return [p for p in self._prompts if p.purpose == purpose]
     
     
 
