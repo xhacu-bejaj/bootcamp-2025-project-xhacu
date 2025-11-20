@@ -67,7 +67,7 @@ class InMemoryStore(PromptStore):
         # I can change the Prompt class and it doesn't affect the InMemoryStore
         self._prompts: List[Prompt] 
         # Contains only prompt_id because it should only do one thing: store a prompt as active for a user, nothing else
-        self._active_prompts:Dict[UserId,List[PromptId]] # Dict of associating user_id with its active_prompts
+        self._active_prompts:Dict[UserId,Dict[PromptId,str]] # Dict of associating user_id with its active_prompts
 
     # Add checks, purpose, name, template cannot be None otherwise creation must fail
     def create(self, purpose: str, name: str, template: str) -> Prompt:
@@ -78,18 +78,18 @@ class InMemoryStore(PromptStore):
     def list(self, purpose: str | None = None) -> List[Prompt]:
         return [p for p in self._prompts if p.purpose == purpose]
     
-    def get(self, prompt_id: UUID) -> Prompt | None:
+    def get(self, prompt_id: PromptId) -> Prompt | None:
         return next((p for p in self._prompts if p.id == prompt_id), None)
     
-    def patch(self, prompt_id: str, template: str) -> Prompt | None:
+    def patch(self, prompt_id: PromptId, template: str) -> Prompt | None:
         # The prompt_id could be non-existant so add a check for that
         for prompt in self._prompts:
             if prompt.id == prompt_id:
                 prompt.template = template
         return prompt
     
-    def set_active(self, user_id: str, purpose: str, prompt_id: str) -> Prompt | None:
-        
+    def set_active(self, user_id: UserId, purpose: str, prompt_id: PromptId) -> Prompt | None:
+        self._active_prompts[user_id] = {prompt_id: purpose}
         return 
     
     
