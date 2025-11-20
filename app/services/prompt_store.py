@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from uuid import uuid4
-from typing import TypeAlias
+from typing import List, TypeAlias
 import json, os
 
 from ..models.domain import Prompt
@@ -62,7 +62,20 @@ class PromptStore(ABC):
 
 
 class InMemoryStore(PromptStore):
-    ...
+    def __init__(self):
+        # This way the storage is independent of Prompt
+        # I can change the Prompt class and it doesn't affect the InMemoryStore
+        self._prompts: List[Prompt] 
+        self._active_prompts:List[Prompt]
+
+    def create(self, purpose: str, name: str, template: str) -> Prompt:
+        return Prompt(str(uuid4()), purpose, name, template)
+    
+    def list(self, purpose: str | None = None) -> List[Prompt]:
+        # Let the option str | None so that it returns all prompts if none is specified
+        return [p for p in self._prompts if p.purpose != purpose]
+    
+    
 
 
 class FileSnapshotStore(InMemoryStore):
