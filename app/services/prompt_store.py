@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from uuid import uuid4
+from uuid import uuid4, UUID
 from typing import List, TypeAlias
 import json, os
 
@@ -72,8 +72,10 @@ class InMemoryStore(PromptStore):
         return Prompt(str(uuid4()), purpose, name, template)
     
     def list(self, purpose: str | None = None) -> List[Prompt]:
-        # Let the option str | None so that it returns all prompts if none is specified
         return [p for p in self._prompts if p.purpose == purpose]
+    
+    def get(self, prompt_id: UUID) -> Prompt | None:
+        return next((p for p in self._prompts if p.id == prompt_id), None)
     
     
 
