@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from uuid import uuid4, UUID
-from typing import List, TypeAlias
+from typing import Dict, List, TypeAlias
 import json, os
 
 from ..models.domain import Prompt
@@ -66,14 +66,14 @@ class InMemoryStore(PromptStore):
         # This way the storage is independent of Prompt
         # I can change the Prompt class and it doesn't affect the InMemoryStore
         self._prompts: List[Prompt] 
-        self._active_prompts:List[Prompt] # use dict {user:prompt.name,  }
+        # Contains only prompt_id because it should only do one thing: store a prompt as active for a user, nothing else
+        self._active_prompts:Dict[UserId,List[PromptId]] # Dict of associating user_id with its active_prompts
 
     # Add checks, purpose, name, template cannot be None otherwise creation must fail
     def create(self, purpose: str, name: str, template: str) -> Prompt:
         new_prompt = Prompt(str(uuid4()), purpose, name, template)
         self._prompts.append(new_prompt)
         return new_prompt
-    
     
     def list(self, purpose: str | None = None) -> List[Prompt]:
         return [p for p in self._prompts if p.purpose == purpose]
@@ -87,6 +87,10 @@ class InMemoryStore(PromptStore):
             if prompt.id == prompt_id:
                 prompt.template = template
         return prompt
+    
+    def set_active(self, user_id: str, purpose: str, prompt_id: str) -> Prompt | None:
+        
+        return 
     
     
 
