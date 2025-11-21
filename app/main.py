@@ -19,7 +19,7 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/v1/prompts", response_model=PromptRead)
+@app.post("/v1/prompts", response_model=PromptCreate)
 def create_prompt(
         data: PromptCreate,
         x_user_id: str = Header(default="user_anon")
@@ -40,7 +40,12 @@ def list_prompts(
         purpose: str | None = None,
         x_user_id: str = Header(default="user_anon")
     ):
-    ...
+    try:
+        prompts_list = store.list(purpose)
+        return prompts_list
+    except Exception as e:
+        raise e 
+    
 
 # prompt_id will pass as parameter to decorated function as prompt_id
 @app.patch("/v1/prompts/{prompt_id}", response_model=PromptRead)
@@ -58,7 +63,16 @@ def activate_prompt(
         purpose: str,
         x_user_id: str = Header(default="user_anon"),
     ):
-    ...
+    try:
+        active_prompt = store.set_active(
+            user_id=x_user_id,
+            purpose=purpose,
+            prompt_id=prompt_id
+        )
+        return activate_prompt
+    except Exception as e:
+        raise e
+
 
 
 @app.post("/v1/predict", response_model=PredictResponse)
