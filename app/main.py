@@ -8,7 +8,8 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 
 
-store = FileSnapshotStore("var/data.json") if settings.FILE_SNAPSHOT else InMemoryStore()
+#store = FileSnapshotStore("var/data.json") if settings.FILE_SNAPSHOT else InMemoryStore()
+store = FileSnapshotStore() if settings.FILE_SNAPSHOT else InMemoryStore()
 app = FastAPI(title="Prompted Doc Processor", version="0.1.0")
 app.add_exception_handler(Exception, http_error_handler)
 setup_logging()
