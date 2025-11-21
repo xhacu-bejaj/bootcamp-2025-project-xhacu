@@ -66,9 +66,8 @@ class InMemoryStore(PromptStore):
         # This way the storage is independent of Prompt
         # I can change the Prompt class and it doesn't affect the InMemoryStore
         self._prompts: List[Prompt] = []
-        self._prompts: List[Prompt] = []
         # Contains only prompt_id because it should only do one thing: store a prompt as active for a user, nothing else
-        self._active_prompts:Dict[UserId,Dict[PromptId,str]] = {} # Dict of associating user_id with its active_prompts
+        self._active_prompts:Dict[Tuple[UserId,Purpose], PromptId] = {} # Dict of associating user_id with its active_prompts
 
     # Add checks, purpose, name, template cannot be None otherwise creation must fail
     def create(self, purpose: Purpose, name: str, template: str) -> Prompt:
