@@ -5,7 +5,7 @@ class Prompt:
     id: str
     purpose: str
     name: str
-    template: str
+    template: str|None
     version: int = 1
     active:bool = False
 

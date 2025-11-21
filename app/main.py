@@ -54,7 +54,14 @@ def patch_prompt(
         data: PromptPatch,
         x_user_id: str = Header(default="user_anon")
     ):
-    ...
+    try:
+        patch_prompt = store.patch(
+            prompt_id=prompt_id,
+            template=data.template
+        )
+        return patch_prompt
+    except Exception as e:
+        raise e
 
 
 @app.post("/v1/prompts/{prompt_id}/activate")
@@ -65,11 +72,11 @@ def activate_prompt(
     ):
     try:
         active_prompt = store.set_active(
-            user_id=x_user_id,
+            prompt_id=prompt_id,
             purpose=purpose,
-            prompt_id=prompt_id
+            user_id=x_user_id
         )
-        return activate_prompt
+        return active_prompt
     except Exception as e:
         raise e
 
