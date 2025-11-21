@@ -24,7 +24,15 @@ def create_prompt(
         data: PromptCreate,
         x_user_id: str = Header(default="user_anon")
     ):
-    ...
+    try:
+        new_prompt = store.create(
+            purpose=data.purpose,
+            name=data.name,
+            template=data.template
+        ) 
+        return new_prompt
+    except Exception as e:
+        raise e
 
 
 @app.get("/v1/prompts", response_model=list[PromptRead])
@@ -34,7 +42,7 @@ def list_prompts(
     ):
     ...
 
-
+# prompt_id will pass as parameter to decorated function as prompt_id
 @app.patch("/v1/prompts/{prompt_id}", response_model=PromptRead)
 def patch_prompt(
         prompt_id: str,
