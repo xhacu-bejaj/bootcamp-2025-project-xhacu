@@ -42,7 +42,7 @@ def list_prompts(
     ):
     ...
 
-
+# prompt_id will pass as parameter to decorated function as prompt_id
 @app.patch("/v1/prompts/{prompt_id}", response_model=PromptRead)
 def patch_prompt(
         prompt_id: str,
