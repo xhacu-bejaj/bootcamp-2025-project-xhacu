@@ -9,8 +9,9 @@ class Prompt:
     version: int = 1
     active:bool = False
 
+    # needed for predict endpoint
     def update(self, template: str):
-        ...
+        self.template = template
 
     def render(self, **kwargs: str):
         ...

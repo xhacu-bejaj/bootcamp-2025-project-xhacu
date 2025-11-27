@@ -1,11 +1,13 @@
 from fastapi import FastAPI, Header, HTTPException
+import uvicorn
 
-from app.models.schemas import PromptCreate, PromptRead, PromptPatch, PredictRequest, PredictResponse
+
 from app.services.prompt_store import FileSnapshotStore, InMemoryStore
 from app.services.processor import process_document
 from app.core.errors import http_error_handler
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.api.routes_prompts import router
 
 
 #store = FileSnapshotStore("var/data.json") if settings.FILE_SNAPSHOT else InMemoryStore()
@@ -14,78 +16,9 @@ app = FastAPI(title="Prompted Doc Processor", version="0.1.0")
 app.add_exception_handler(Exception, http_error_handler)
 setup_logging()
 
+app.include_router(router)
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-
-@app.post("/v1/prompts", response_model=PromptCreate)
-def create_prompt(
-        data: PromptCreate,
-        x_user_id: str = Header(default="user_anon")
-    ):
-    try:
-        new_prompt = store.create(
-            purpose=data.purpose,
-            name = data.name,
-            template=data.template
-        )
-        return new_prompt
-    except Exception as e:
-        raise e
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="127.0.0.1", port=8080, log_level="info", reload=True) 
 
 
-@app.get("/v1/prompts", response_model=list[PromptRead])
-def list_prompts(
-        purpose: str | None = None,
-        x_user_id: str = Header(default="user_anon")
-    ):
-    try:
-        prompts_list = store.list(purpose)
-        return prompts_list
-    except Exception as e:
-        raise e 
-    
-
-# prompt_id will pass as parameter to decorated function as prompt_id
-@app.patch("/v1/prompts/{prompt_id}", response_model=PromptRead)
-def patch_prompt(
-        prompt_id: str,
-        data: PromptPatch,
-        x_user_id: str = Header(default="user_anon")
-    ):
-    try:
-        patch_prompt = store.patch(
-            prompt_id=prompt_id,
-            template=data.template
-        )
-        return patch_prompt
-    except Exception as e:
-        raise e
-
-
-@app.post("/v1/prompts/{prompt_id}/activate")
-def activate_prompt(
-        prompt_id: str,
-        purpose: str,
-        x_user_id: str = Header(default="user_anon"),
-    ):
-    try:
-        active_prompt = store.set_active(
-            prompt_id=prompt_id,
-            purpose=purpose,
-            user_id=x_user_id
-        )
-        return active_prompt
-    except Exception as e:
-        raise e
-
-
-
-@app.post("/v1/predict", response_model=PredictResponse)
-def predict(
-        req: PredictRequest,
-        x_user_id: str = Header(default="user_anon"),
-    ):
-    ...
