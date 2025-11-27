@@ -1,12 +1,15 @@
 from fastapi import FastAPI, Header, HTTPException
 import uvicorn
 
+import uvicorn
+
 
 from app.services.prompt_store import FileSnapshotStore, InMemoryStore
 from app.services.processor import process_document
 from app.core.errors import http_error_handler
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.api.routes_prompts import router
 from app.api.routes_prompts import router
 
 
@@ -20,5 +23,3 @@ app.include_router(router)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8080, log_level="info", reload=True) 
-
-
