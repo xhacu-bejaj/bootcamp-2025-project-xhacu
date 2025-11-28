@@ -1,11 +1,12 @@
 from fastapi import APIRouter, FastAPI, Header, HTTPException
 
 from app.models.schemas import PromptCreate, PromptRead, PromptPatch, PredictRequest, PredictResponse
-from app.services.prompt_store import FileSnapshotStore, InMemoryStore
+from app.services.prompt_store import FileSnapshotStore, InMemoryStore, Purpose, UserId, Prompt
 from app.services.processor import process_document
 from app.core.errors import http_error_handler
 from app.core.config import settings
 from app.core.logging import setup_logging
+
 
 
 
@@ -17,7 +18,7 @@ store = FileSnapshotStore() if settings.FILE_SNAPSHOT else InMemoryStore()
 def health():
     return {'status':'ok'}
 
-@router.post("/v1/prompts", response_model=PromptCreate)
+@router.post("/prompts", response_model=PromptCreate)
 def create_prompt(
         data: PromptCreate,
         x_user_id: str = Header(default="user_anon")
@@ -32,9 +33,9 @@ def create_prompt(
     except Exception as e:
         raise e
     
-@router.get("/v1/prompts/{purpose}", response_model=list[PromptRead])
+@router.get("/prompts/{purpose}", response_model=list[PromptRead])
 def list_prompts(
-        purpose: str | None = None,
+        purpose: Purpose | None = None, # change to prompt
         x_user_id: str = Header(default="user_anon")
     ):
     try:
@@ -42,8 +43,8 @@ def list_prompts(
         return prompts_list
     except Exception as e:
         raise e 
-    
-@router.patch("/v1/prompts/{prompt_id}", response_model=PromptPatch)
+
+@router.patch("/prompts/{prompt_id}", response_model=PromptPatch)
 def patch_prompt(
         prompt_id: str,
         data: PromptPatch,
@@ -58,10 +59,10 @@ def patch_prompt(
     except Exception as e:
         raise e
     
-@router.post("/v1/prompts/{prompt_id}/activate")
+@router.post("/prompts/{prompt_id}/activate")
 def activate_prompt(
         prompt_id: str,
-        purpose: str,
+        purpose: Purpose,
         x_user_id: str = Header(default="user_anon"),
     ):
     try:
@@ -74,7 +75,20 @@ def activate_prompt(
     except Exception as e:
         raise e
     
-@router.post("/v1/predict", response_model=PredictResponse)
+@router.get("/prompts/active")
+def get_user_active_prompts(
+                            user_id: UserId,
+                            purpose: Purpose, 
+                            #x_user_id: str = Header(default="user_anon")
+                             ):
+    try:
+        active_prompt = store.get_active(user_id=user_id, purpose=purpose)
+        return activate_prompt
+    except Exception as e:
+        raise e
+
+    
+@router.post("/predict", response_model=PredictResponse)
 def predict(
         req: PredictRequest,
         x_user_id: str = Header(default="user_anon"),

@@ -100,7 +100,7 @@ class InMemoryStore(PromptStore):
     
     #self._active_prompts:Dict[Tuple[UserId,Purpose], PromptId]
     # Get THE active prompts for a specific user and a specific purpose
-    def get_active(self, user_id: str, purpose: Purpose) -> Prompt | None:
+    def get_active(self, user_id: UserId, purpose: Purpose) -> Prompt | None:
         active_prompt_id = self._active_prompts[(user_id, purpose)]
         # This method signature suggests that a active prompt is identified by user_id and purpose
         for prompt in self._prompts: 
