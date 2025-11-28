@@ -22,26 +22,21 @@ def create_prompt(
         data: PromptCreate,
         x_user_id: str = Header(default="user_anon")
     ):
-    try:
         new_prompt = store.create(
             purpose=data.purpose,
             name = data.name,
             template=data.template
         )
         return new_prompt
-    except Exception as e:
-        raise e
+
     
 @router.get("/v1/prompts/{purpose}", response_model=list[PromptRead])
 def list_prompts(
-        purpose: str | None = None,
+        purpose: str,
         x_user_id: str = Header(default="user_anon")
     ):
-    try:
-        prompts_list = store.list(purpose)
-        return prompts_list
-    except Exception as e:
-        raise e 
+        return store.list(purpose)
+ 
     
 @router.patch("/v1/prompts/{prompt_id}", response_model=PromptPatch)
 def patch_prompt(

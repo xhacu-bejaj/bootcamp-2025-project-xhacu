@@ -75,17 +75,18 @@ class InMemoryStore(PromptStore):
         self._prompts.append(new_prompt)                                            
         return new_prompt
     
-    def list(self, purpose: Purpose|None=None) -> List[Prompt]: 
+    def list(self, purpose: Purpose) -> List[Prompt]: # add check if supplied purpose is not present
         return [p for p in self._prompts if p.purpose == purpose]
     
     def get(self, prompt_id: PromptId) -> Prompt | None:
         return next((p for p in self._prompts if p.id == prompt_id), None)
     
-    def patch(self, prompt_id: PromptId, template: str|None=None) -> Prompt:
+    def patch(self, prompt_id: PromptId, template: str) -> Prompt:
         # The prompt_id could be non-existant so add a check for that
         for prompt in self._prompts:
             if prompt.id == prompt_id:
                 prompt.template = template
+                prompt.version = prompt.version + 1 
         return prompt
     
     
