@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import logging
 from typing import Any
+import json
 
 
 from google import genai
@@ -19,7 +20,7 @@ class GoogleLLM(LLMClient):
     model: str='gemini-2.5-flash'
     temperature: float=0.5
     max_output_tokens: int=2000
-    SYSTEM_GUARDRAIL: str = "You are a helpful, ethical, and safe assistant. You must refuse requests that promote illegal acts, hate speech, or explicit content. Respond only to appropriate topics."
+    #SYSTEM_GUARDRAIL: str = "You are a helpful, ethical, and safe assistant. You must refuse requests that promote illegal acts, hate speech, or explicit content. Respond only to appropriate topics."
 
 
     def __post_init__(self):
@@ -37,13 +38,15 @@ class GoogleLLM(LLMClient):
         self.config = GenerateContentConfig()
         #google_logger.info(f"GoogleAIClient initialized with model: {self.model}")
 
-    def generate(self, prompt: str, **kwargs: Any) -> GenerateResponse:
+    def generate(self, prompt: str, **kwargs: Any) -> PredictResponse:
         #google_logger.info(f"Generating content using Google client for prompt: '{prompt}...'")
         
         config_params = {
             "temperature": self.temperature,
             "max_output_tokens": self.max_output_tokens,
-            "system_instruction": self.SYSTEM_GUARDRAIL, 
+            #"system_instruction": self.SYSTEM_GUARDRAIL, 
+            #"response_mime_type":"application/json" or text
+            #"response_schema":PredictResponse
         }
         
         config_params.update(kwargs)
@@ -56,10 +59,18 @@ class GoogleLLM(LLMClient):
                 config=config
             )
             
-            if not response.text:
-                 raise ValueError("Google API returned an empty response.")
-            #google_logger.info("Google client successfully generated content.")
-            return GenerateResponse(response=response.text)
+            if not response:
+                raise ValueError("Google API returned an empty response.")
+            
+            try:
+                json_data = json.loads(response.text)
+            except Exception as e:
+                raise ValueError(f"Failed to parse LLM output as JSON: {e}")
+                
+            
+
+            
+            
             
         except Exception as e:
             #google_logger.error(f"Google client failed to generate content: {e}")

@@ -3,7 +3,7 @@ from enum import Enum
 from app.services.llm_client import LLMClient
 
 
-class Provider(str,Enum):
+class Provider(Enum):
     OPENAI = 'openai'
     GOOGLE = 'google'
     MOCK = 'mock'

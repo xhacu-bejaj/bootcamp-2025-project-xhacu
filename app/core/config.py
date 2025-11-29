@@ -4,11 +4,11 @@ class Settings(BaseSettings):
     FILE_SNAPSHOT: bool = False
     
     LOG_LEVEL: str = "INFO" 
-    DB_PATH: str = 'promptlog.db'
+    #DB_PATH: str = 'promptlog.db'
     GOOGLE_API_KEY: str = ''
     OPENAI_API_KEY: str = ''
     LOG_FILE_PATH: str = 'service-history.log'
-    MONGODB_CONNECTION_STRING: str = ''
+    #MONGODB_CONNECTION_STRING: str = ''
     
     model_config = SettingsConfigDict(env_file=".env") 
 
