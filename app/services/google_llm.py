@@ -10,7 +10,7 @@ from google.genai.types import GenerateContentConfig
 from app.models.domain import Prompt
 from app.services.llm_client import LLMClient
 from app.core import config
-from app.models.schemas import PredictResponse, PredictRequest
+from app.models.schemas import PredictResponse
 
 
 global_settings = config.Settings()
@@ -39,13 +39,13 @@ class GoogleLLM(LLMClient):
         self.config = GenerateContentConfig()
         #google_logger.info(f"GoogleAIClient initialized with model: {self.model}")
 
-    def generate(self, prompt: Prompt, **kwargs: Any) -> PredictResponse | None:
+    def generate(self, template: str | None, document_text: str, **kwargs) -> PredictResponse | None:
         #google_logger.info(f"Generating content using Google client for prompt: '{prompt}...'")
         
         config_params = {
             "temperature": self.temperature,
             "max_output_tokens": self.max_output_tokens,
-            "system_instruction": prompt.template, 
+            "system_instruction": template, 
             "response_mime_type":"application/json",
             "response_schema": PredictResponse
         }
@@ -54,22 +54,21 @@ class GoogleLLM(LLMClient):
         config = GenerateContentConfig(**config_params)
         #####################################################
         ########## GEMINI INITIALIZED AND CONFIG SET ########
+        
+        response = self.client.models.generate_content( # fails here
+            model=self.model, 
+            contents=document_text, 
+            config=config
+        )
+            
+        if response.text:
+            json_data = json.loads(response.text)
+            model_info_dict = json_data.pop('model_info')
+            model_info = dict(**model_info_dict)
+            resp = PredictResponse(model_info=model_info, **json_data)
+            return resp
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.model, 
-                contents=prompt, 
-                config=config
-            )
-            if response.text:
-                try:
-                    json_data = json.loads(response.text)
-                    return PredictResponse(**json_data)
-                except json.JSONDecodeError as e:
-                    raise ValueError(f"Failed to parse LLM output as JSON: {e}")
 
-        except Exception as e:
-            raise ValueError("Client did not generate content") from e
     
 
         

@@ -1,9 +1,9 @@
 from fastapi import APIRouter, FastAPI, Header, HTTPException
 
-from app.models.domain import Prompt
+
 from app.models.schemas import PromptCreate, PromptRead, PromptPatch, PredictRequest, PredictResponse
 from app.services.prompt_store import FileSnapshotStore, InMemoryStore, Purpose, UserId
-from app.services.processor import process_document
+
 from app.core.errors import http_error_handler
 from app.core.config import settings
 from app.core.logging import setup_logging
@@ -11,15 +11,15 @@ from app.core.logging import setup_logging
 
 
 
-router = APIRouter(prefix="/v1")
+prompt_router = APIRouter(prefix="/v1")
 store = FileSnapshotStore() if settings.FILE_SNAPSHOT else InMemoryStore()
 
 
-@router.get('/health')
+@prompt_router.get('/health')
 def health():
     return {'status':'ok'}
 
-@router.post("/prompts", response_model=PromptCreate)
+@prompt_router.post("/prompts", response_model=PromptCreate)
 def create_prompt(
         data: PromptCreate,
         x_user_id: str = Header(default="user_anon")
@@ -32,7 +32,7 @@ def create_prompt(
         return new_prompt
 
     
-@router.get("/prompts/{purpose}", response_model=list[PromptRead])
+@prompt_router.get("/prompts/{purpose}", response_model=list[PromptRead])
 def list_prompts(
         purpose: Purpose,
         x_user_id: str = Header(default="user_anon")
@@ -41,7 +41,7 @@ def list_prompts(
         return prompts_list
 
     
-@router.patch("/prompts/{prompt_id}", response_model=PromptPatch)
+@prompt_router.patch("/prompts/{prompt_id}", response_model=PromptPatch)
 def patch_prompt(
         prompt_id: str,
         data: PromptPatch,
@@ -52,7 +52,7 @@ def patch_prompt(
                                      template=data.template)
         return patched_prompt
 
-@router.post("/prompts/{prompt_id}/activate")
+@prompt_router.post("/prompts/{prompt_id}/activate")
 def activate_prompt(
         prompt_id: str,
         purpose: Purpose,
@@ -65,7 +65,7 @@ def activate_prompt(
         )
         return active_prompt
     
-@router.get('/get_active/{purpose}')
+@prompt_router.get('/get_active/{purpose}')
 def get_active(user_id: UserId, purpose: Purpose):
        return store.get_active(user_id=user_id, purpose=purpose)
     

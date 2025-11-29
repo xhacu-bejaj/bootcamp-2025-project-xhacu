@@ -8,7 +8,8 @@ from app.services.processor import process_document
 from app.core.errors import http_error_handler
 from app.core.config import settings
 from app.core.logging import setup_logging
-from app.api.routes_prompts import router
+from app.api.routes_prompts import prompt_router
+from app.api.routes_predict import predict_router
 
 
 
@@ -18,7 +19,9 @@ app = FastAPI(title="Prompted Doc Processor", version="0.1.0")
 app.add_exception_handler(Exception, http_error_handler)
 setup_logging()
 
-app.include_router(router)
+app.include_router(prompt_router)
+app.include_router(predict_router)
+
 
 #if __name__ == "__main__":
 

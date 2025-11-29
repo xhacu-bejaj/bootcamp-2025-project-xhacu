@@ -25,7 +25,7 @@ class PredictRequest(BaseModel):
     document_text: str
     params: Optional[dict] = None
     #provider: str = "mock"
-    provider: Provider = Provider.MOCK
+    provider: Provider = Provider.GOOGLE
 
 class PredictResponse(BaseModel):
     output_text: str

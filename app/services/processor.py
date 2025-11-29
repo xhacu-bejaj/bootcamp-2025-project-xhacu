@@ -1,12 +1,7 @@
-#from .llm_client import PROVIDERS
-from enum import Enum
-import enum
-from ssl import Purpose
-
 from fastapi import HTTPException
 
 from app.models.domain import Prompt
-from app.models.schemas import PredictRequest, PredictResponse
+from app.models.schemas import PredictResponse
 from .llm_client_factory import LLMClientFactory, Provider
 from .prompt_store import InMemoryStore, PromptStore, UserId
 
@@ -15,17 +10,20 @@ def process_document(
         user_id: UserId,
         purpose: str,
         document_text: str,
-        provider: Provider = Provider.MOCK,
+        provider: Provider = Provider.GOOGLE,
         **params,
-    )->PredictResponse | None:
-    store = InMemoryStore()
+    )-> PredictResponse | None:
+    # maybe unpack Prompt , i do not need all the attrbutes
     active_prompt: Prompt | None = store.get_active(user_id, purpose)
     try:
         llm_client = LLMClientFactory().create_client(provider)
     except ValueError as e:
          raise HTTPException(status_code=400, detail=f"Invalid provider: {provider}. Must be one of 'mock', 'openai', or 'google'.")
-    ### Client instanciated, the input we will send to the Client will be template+doc
-    ### which template to use depends on the purpose the user gave us 
+    
+    template = active_prompt.template # type: ignore
+
+    post_process_doc = llm_client.generate(template, document_text, **params)
+    return post_process_doc
     
 
 
