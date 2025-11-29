@@ -133,8 +133,6 @@ class InMemoryStore(PromptStore):
             
         
     
-    
-
 
 class FileSnapshotStore(InMemoryStore):
     """Wraps InMemoryStore and snapshots to var/data.json on writes."""
