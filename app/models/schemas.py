@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 
+from app.services.llm_client_factory import Provider
+
 class PromptCreate(BaseModel):
     purpose: str = Field(..., examples=["summarize", "extract_entities"])
     name: str
@@ -22,7 +24,8 @@ class PredictRequest(BaseModel):
     purpose: str
     document_text: str
     params: Optional[dict] = None
-    provider: str = "mock"
+    #provider: str = "mock"
+    provider: Provider = Provider.MOCK
 
 class PredictResponse(BaseModel):
     output_text: str

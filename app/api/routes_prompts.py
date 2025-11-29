@@ -69,9 +69,3 @@ def activate_prompt(
 def get_active(user_id: UserId, purpose: Purpose):
        return store.get_active(user_id=user_id, purpose=purpose)
     
-@router.post("/predict", response_model=PredictResponse)
-def predict_prompt(
-        req: PredictRequest,
-        x_user_id: str = Header(default="user_anon"),
-    ):
-    ...

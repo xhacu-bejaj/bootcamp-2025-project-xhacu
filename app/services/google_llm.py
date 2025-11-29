@@ -7,6 +7,7 @@ import json
 from google import genai
 from google.genai.types import GenerateContentConfig
 
+from app.models.domain import Prompt
 from app.services.llm_client import LLMClient
 from app.core import config
 from app.models.schemas import PredictResponse, PredictRequest
@@ -38,40 +39,39 @@ class GoogleLLM(LLMClient):
         self.config = GenerateContentConfig()
         #google_logger.info(f"GoogleAIClient initialized with model: {self.model}")
 
-    def generate(self, prompt: str, **kwargs: Any) -> PredictResponse:
+    def generate(self, prompt: Prompt, **kwargs: Any) -> PredictResponse | None:
         #google_logger.info(f"Generating content using Google client for prompt: '{prompt}...'")
         
         config_params = {
             "temperature": self.temperature,
             "max_output_tokens": self.max_output_tokens,
-            #"system_instruction": self.SYSTEM_GUARDRAIL, 
-            #"response_mime_type":"application/json" or text
-            #"response_schema":PredictResponse
+            "system_instruction": prompt.template, 
+            "response_mime_type":"application/json",
+            "response_schema": PredictResponse
         }
         
         config_params.update(kwargs)
         config = GenerateContentConfig(**config_params)
-        
+        #####################################################
+        ########## GEMINI INITIALIZED AND CONFIG SET ########
+
         try:
             response = self.client.models.generate_content(
                 model=self.model, 
                 contents=prompt, 
                 config=config
             )
-            
-            if not response:
-                raise ValueError("Google API returned an empty response.")
-            
-            try:
-                json_data = json.loads(response.text)
-            except Exception as e:
-                raise ValueError(f"Failed to parse LLM output as JSON: {e}")
-                
-            
+            if response.text:
+                try:
+                    json_data = json.loads(response.text)
+                    return PredictResponse(**json_data)
+                except json.JSONDecodeError as e:
+                    raise ValueError(f"Failed to parse LLM output as JSON: {e}")
 
-            
-            
-            
         except Exception as e:
-            #google_logger.error(f"Google client failed to generate content: {e}")
-            raise ValueError("Client 'Google' did not generate content") from e
+            raise ValueError("Client did not generate content") from e
+    
+
+        
+            
+            
