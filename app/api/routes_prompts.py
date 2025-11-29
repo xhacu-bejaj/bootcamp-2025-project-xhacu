@@ -1,7 +1,8 @@
 from fastapi import APIRouter, FastAPI, Header, HTTPException
 
+from app.models.domain import Prompt
 from app.models.schemas import PromptCreate, PromptRead, PromptPatch, PredictRequest, PredictResponse
-from app.services.prompt_store import FileSnapshotStore, InMemoryStore
+from app.services.prompt_store import FileSnapshotStore, InMemoryStore, Purpose, UserId
 from app.services.processor import process_document
 from app.core.errors import http_error_handler
 from app.core.config import settings
@@ -17,7 +18,7 @@ store = FileSnapshotStore() if settings.FILE_SNAPSHOT else InMemoryStore()
 def health():
     return {'status':'ok'}
 
-@router.post("/v1/prompts", response_model=PromptCreate)
+@router.post("/prompts", response_model=PromptCreate)
 def create_prompt(
         data: PromptCreate,
         x_user_id: str = Header(default="user_anon")
@@ -30,46 +31,44 @@ def create_prompt(
         return new_prompt
 
     
-@router.get("/v1/prompts/{purpose}", response_model=list[PromptRead])
+@router.get("/prompts/{purpose}", response_model=list[PromptRead])
 def list_prompts(
-        purpose: str,
+        purpose: Purpose,
         x_user_id: str = Header(default="user_anon")
     ):
-        return store.list(purpose)
- 
+        prompts_list = store.list(purpose)
+        return prompts_list
+
     
-@router.patch("/v1/prompts/{prompt_id}", response_model=PromptPatch)
+@router.patch("/prompts/{prompt_id}", response_model=PromptPatch)
 def patch_prompt(
         prompt_id: str,
         data: PromptPatch,
         x_user_id: str = Header(default="user_anon")
     ):
-    try:
-        patch_prompt = store.patch(
-            prompt_id=prompt_id,
-            template=data.template
-        )
-        return patch_prompt
-    except Exception as e:
-        raise e
-    
-@router.post("/v1/prompts/{prompt_id}/activate")
+        patched_prompt = store.patch(prompt_id=prompt_id,
+                                     name=data.name,
+                                     template=data.template)
+        return patched_prompt
+
+@router.post("/prompts/{prompt_id}/activate")
 def activate_prompt(
         prompt_id: str,
         purpose: str,
         x_user_id: str = Header(default="user_anon"),
     ):
-    try:
         active_prompt = store.set_active(
             prompt_id=prompt_id,
             purpose=purpose,
             user_id=x_user_id
         )
         return active_prompt
-    except Exception as e:
-        raise e
     
-@router.post("/v1/predict", response_model=PredictResponse)
+@router.get('/get_active/{purpose}')
+def get_active(user_id: UserId, purpose: Purpose):
+       return store.get_active(user_id=user_id, purpose=purpose)
+    
+@router.post("/predict", response_model=PredictResponse)
 def predict(
         req: PredictRequest,
         x_user_id: str = Header(default="user_anon"),

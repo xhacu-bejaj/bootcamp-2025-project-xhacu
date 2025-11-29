@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from uuid import uuid4, UUID
-from typing import Dict, List, Tuple, TypeAlias
+from typing import Dict, List, Optional, Tuple, TypeAlias
 import json, os
 
 from ..models.domain import Prompt
@@ -40,6 +40,7 @@ class PromptStore(ABC):
             self,
             prompt_id: PromptId,
             template: str,
+            name: str
         ) -> Prompt | None:
         ...
 
@@ -75,41 +76,60 @@ class InMemoryStore(PromptStore):
         self._prompts.append(new_prompt)                                            
         return new_prompt
     
-    def list(self, purpose: Purpose) -> List[Prompt]: # add check if supplied purpose is not present
+    def list(self, purpose: Purpose | None) -> list[Prompt]: 
         return [p for p in self._prompts if p.purpose == purpose]
     
     def get(self, prompt_id: PromptId) -> Prompt | None:
         return next((p for p in self._prompts if p.id == prompt_id), None)
     
-    def patch(self, prompt_id: PromptId, template: str) -> Prompt:
-        # The prompt_id could be non-existant so add a check for that
+    def patch(self, prompt_id: PromptId, name: Optional[str], template: Optional[str]) -> Prompt | None:
         for prompt in self._prompts:
+            
             if prompt.id == prompt_id:
-                prompt.template = template
-                prompt.version = prompt.version + 1 
-        return prompt
+                is_updated = False
+                
+                if name is not None:
+                    prompt.name = name
+                    is_updated = True
+                
+                if template is not None:
+                    prompt.template = template
+                    is_updated = True
+                
+                if is_updated:
+                    prompt.version += 1
+                
+                return prompt
+            
+        return None
     
     
     def set_active(self, user_id: UserId, purpose: Purpose, prompt_id: PromptId) -> Prompt | None:
-        # it must be in self._prompts
-        self._active_prompts[(user_id,purpose)] = prompt_id # Add it to _active_prompts ==> prompt_id is active
-        for prompt in self._prompts: 
-            if prompt_id == prompt.id:
-                prompt.active = True
-                return prompt
-        return None
+        new_active_prompt = next((p for p in self._prompts if p.id == prompt_id), None)
     
-    #self._active_prompts:Dict[Tuple[UserId,Purpose], PromptId]
-    # Get THE active prompts for a specific user and a specific purpose
-    def get_active(self, user_id: str, purpose: Purpose) -> Prompt | None:
-        active_prompt_id = self._active_prompts[(user_id, purpose)]
-        # This method signature suggests that a active prompt is identified by user_id and purpose
-        for prompt in self._prompts: 
-            if prompt.id == active_prompt_id:
-                return prompt
-        return None
+        if new_active_prompt is None: # raise exception and log
+            return None
+        
+        active_key = (user_id, purpose)
+        
+        if active_key in self._active_prompts:
+            return None
+        
+        self._active_prompts[active_key] = prompt_id 
+        
+        new_active_prompt.active = True
+            
+        return new_active_prompt
+            
+    def get_active(self, user_id: UserId, purpose: Purpose) -> Prompt | None:
+        
+        active_prompt_id = self._active_prompts.get((user_id, purpose))
+        # If user_id does not have an active prompt for purpose return 
+        if active_prompt_id is None:
+            return None
+            
+        return next((p for p in self._prompts if p.id == active_prompt_id), None)
     
-    ############# Create a method to easily retrieve from self._prompt and self._active_prompt
             
         
     
