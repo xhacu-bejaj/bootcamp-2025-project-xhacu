@@ -17,11 +17,12 @@ def predict_prompt(
         req: PredictRequest,
         x_user_id: str = Header(default="user_anon"),
     ):
+    
     purpose=req.purpose
     document_text=req.document_text
-    params = {'provider': Provider.GOOGLE, 'temperature': 0.5}
-    
+    params = req.params
+    provider = req.provider
 
-    post_process_doc = process_document(store, x_user_id, purpose, document_text, **params)
+    post_process_doc = process_document(store, x_user_id, purpose, document_text, provider, params=params)
     return post_process_doc
 

@@ -11,6 +11,7 @@ from app.models.domain import Prompt
 from app.services.llm_client import LLMClient
 from app.core import config
 from app.models.schemas import PredictResponse
+from app.services.llm_client_factory import Provider
 
 
 global_settings = config.Settings()
