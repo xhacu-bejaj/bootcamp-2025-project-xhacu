@@ -1,29 +1,26 @@
-from enum import Enum
-
 from app.services.llm_client import LLMClient
+from app.services.google_llm import GoogleLLM
+from app.services.mock_llm import MockLLM
+from app.services.openai_llm import OpenaiLLM
 
 
-class Provider(Enum):
-    OPENAI = 'openai'
-    GOOGLE = 'google'
-    MOCK = 'mock'
+
+
+PROVIDERS = {"mock": MockLLM, "openai": OpenaiLLM, "google": GoogleLLM}
 
 class LLMClientFactory:
     @staticmethod
-    def create_client(provider: Provider) -> LLMClient:
-        if provider == Provider.OPENAI:
-            from app.services.openai_llm import OpenaiLLM
+    def create_client(provider: str) -> LLMClient:
+        provider= provider.lower()
+        if provider == 'openai':
             return OpenaiLLM()
         
-        elif provider == Provider.GOOGLE:
-            from app.services.google_llm import GoogleLLM
+        elif provider == 'google':
             return GoogleLLM()
         
-        elif provider == Provider.MOCK:
-            from app.services.mock_llm import MockLLM
+        elif provider == 'mock':
             return MockLLM()
         
         else:
             raise ValueError("Client not supported")
         
-#PROVIDERS = {"mock": MockLLM, "openai": OpenaiLLM, "google": GoogleLLM}

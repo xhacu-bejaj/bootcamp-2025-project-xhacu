@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     #DB_PATH: str = 'promptlog.db'
     GOOGLE_API_KEY: str = ''
     OPENAI_API_KEY: str = ''
+    DEEPSEEK_API_KEY: str = ''
     LOG_FILE_PATH: str = 'service-history.log'
     #MONGODB_CONNECTION_STRING: str = ''
     

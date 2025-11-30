@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-from uuid import uuid4, UUID
+from uuid import uuid4
 from typing import Dict, List, Optional, Tuple, TypeAlias
-import json, os
 
 from ..models.domain import Prompt
 

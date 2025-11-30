@@ -5,7 +5,7 @@ from app.services.processor import process_document
 from app.core.config import settings
 from app.models.domain import Prompt
 from app.models.schemas import PromptCreate, PromptRead, PromptPatch, PredictRequest, PredictResponse
-from app.services.llm_client_factory import LLMClientFactory, Provider
+from app.services.llm_client_factory import LLMClientFactory
 from app.api.routes_prompts import store
 
 predict_router = APIRouter(prefix="/v1")
@@ -17,12 +17,16 @@ def predict_prompt(
         req: PredictRequest,
         x_user_id: str = Header(default="user_anon"),
     ):
-    
+
     purpose=req.purpose
     document_text=req.document_text
-    params = req.params
+    llm_params_dict = req.params.model_dump(exclude_none=True) if req.params else {}
     provider = req.provider
 
-    post_process_doc = process_document(store, x_user_id, purpose, document_text, provider, params=params)
+    post_process_doc = process_document(store, x_user_id, 
+                                        purpose, 
+                                        document_text, 
+                                        provider, 
+                                        **llm_params_dict)
     return post_process_doc
 
