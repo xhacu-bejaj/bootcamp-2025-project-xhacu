@@ -3,6 +3,11 @@ from uuid import uuid4
 from typing import Dict, List, Optional, Tuple, TypeAlias
 
 from ..models.domain import Prompt
+from app.core.logging import setup_logging, log_api_call
+
+
+
+setup_logging()
 
 
 UserId: TypeAlias = str
@@ -70,17 +75,21 @@ class InMemoryStore(PromptStore):
         self._active_prompts:Dict[Tuple[UserId,Purpose], PromptId] = {} # Dict of associating user_id with its active_prompts
 
     # Add checks, purpose, name, template cannot be None otherwise creation must fail
+    @log_api_call
     def create(self, purpose: Purpose, name: str, template: str) -> Prompt:
         new_prompt = Prompt(str(uuid4()), purpose, name, template)
         self._prompts.append(new_prompt)                                            
         return new_prompt
     
+    @log_api_call
     def list(self, purpose: Purpose | None) -> list[Prompt]: 
         return [p for p in self._prompts if p.purpose == purpose]
     
+    @log_api_call
     def get(self, prompt_id: PromptId) -> Prompt | None:
         return next((p for p in self._prompts if p.id == prompt_id), None)
     
+    @log_api_call
     def patch(self, prompt_id: PromptId, name: Optional[str], template: Optional[str]) -> Prompt | None:
         for prompt in self._prompts:
             
@@ -102,7 +111,7 @@ class InMemoryStore(PromptStore):
             
         return None
     
-    
+    @log_api_call
     def set_active(self, user_id: UserId, purpose: Purpose, prompt_id: PromptId) -> Prompt | None:
         new_active_prompt = next((p for p in self._prompts if p.id == prompt_id), None)
     
@@ -119,7 +128,8 @@ class InMemoryStore(PromptStore):
         new_active_prompt.active = True
             
         return new_active_prompt
-            
+
+    @log_api_call    
     def get_active(self, user_id: UserId, purpose: Purpose) -> Prompt | None:
         
         active_prompt_id = self._active_prompts.get((user_id, purpose))

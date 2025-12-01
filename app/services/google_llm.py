@@ -1,8 +1,6 @@
 from dataclasses import dataclass
-import logging
 import time
-from typing import Any, Set
-import json
+from typing import Set
 
 
 from fastapi import HTTPException
@@ -13,20 +11,21 @@ from app.models.domain import Prompt
 from app.services.llm_client import LLMClient
 from app.core import config
 from app.models.schemas import ModelInfo, PredictResponse
+from app.core.logging import setup_logging, log_api_call
 
 
 
 global_settings = config.Settings()
-#google_logger = logging.getLogger("GOOGLE")
+setup_logging()
 
 @dataclass
 class GoogleLLM(LLMClient):
     # Default model params if user does not specify any
     model: str='gemini-2.5-flash'
     temperature: float=0.5
-    #SYSTEM_GUARDRAIL: str = "You are a helpful, ethical, and safe assistant. You must refuse requests that promote illegal acts, hate speech, or explicit content. Respond only to appropriate topics."
+    
 
-
+    @log_api_call
     def __post_init__(self):
         try:
             GOOGLE_API_KEY = global_settings.GOOGLE_API_KEY
@@ -41,7 +40,7 @@ class GoogleLLM(LLMClient):
         self.client = genai.Client(api_key=GOOGLE_API_KEY)
         self.config = GenerateContentConfig()
         #google_logger.info(f"GoogleAIClient initialized with model: {self.model}")
-
+    @log_api_call
     def generate(self, active_prompt: Prompt, document_text: str, **kwargs) -> PredictResponse | None:
         #google_logger.info(f"Generating content using Google client for prompt: '{prompt}...'")
 
@@ -116,13 +115,7 @@ class GoogleLLM(LLMClient):
 
 
 
-        # if response.text:
-        #     json_data = json.loads(response.text)
-        #     model_info_dict = json_data.pop('model_info')
-        #     model_info = dict(**model_info_dict)
-        #     resp = PredictResponse(model_info=model_info, **json_data)
-        #     return resp
-
+    
 
     
 

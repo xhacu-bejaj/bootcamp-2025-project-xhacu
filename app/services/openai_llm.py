@@ -11,6 +11,11 @@ from app.models.domain import Prompt
 from app.services.llm_client import LLMClient
 from app.models.schemas import ModelInfo, OpenaiOutputSchema, PredictRequest, PredictResponse
 from app.core import config
+from app.core.logging import setup_logging, log_api_call
+
+
+
+setup_logging()
 
 global_settings = config.Settings()
 #openai_logger = logging.getLogger("OPENAI")
@@ -20,11 +25,10 @@ class OpenaiLLM(LLMClient):
     # Default model params if user does not specify any
     model: str = 'gpt-4o-mini'
     temperature: float = 0.5
-    # The 'provider' field is implicit, but useful for ModelInfo
     provider_name: str = 'openai' 
 
+    @log_api_call
     def __post_init__(self):
-        # Initialization and API Key Check
         try:
             OPENAI_API_KEY = global_settings.OPENAI_API_KEY
         except Exception:
@@ -33,9 +37,9 @@ class OpenaiLLM(LLMClient):
         if not OPENAI_API_KEY:
             raise ValueError("OPENAI_API_KEY is missing or empty.")
         
-        # Initialize the OpenAI Client
         self.client = OpenAI(api_key=OPENAI_API_KEY)
 
+    @log_api_call
     def generate(self, active_prompt: Prompt, document_text: str, **kwargs) -> PredictResponse | None:
         
         VALID_CONFIG_KEYS: Set[str] = {

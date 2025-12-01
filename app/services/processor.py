@@ -4,7 +4,13 @@ from app.models.domain import Prompt
 from app.models.schemas import PredictResponse, LLMParams
 from .llm_client_factory import LLMClientFactory
 from .prompt_store import InMemoryStore, PromptStore, UserId
+from app.core.logging import setup_logging, log_api_call
 
+
+
+setup_logging()
+
+@log_api_call
 def process_document(
         store: PromptStore, # our db where all the (active) prompts = purpose + template are stored
         user_id: UserId, # needed for prompt retrieval

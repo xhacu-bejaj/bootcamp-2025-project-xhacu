@@ -7,12 +7,14 @@ from app.models.domain import Prompt
 from app.models.schemas import PromptCreate, PromptRead, PromptPatch, PredictRequest, PredictResponse
 from app.services.llm_client_factory import LLMClientFactory
 from app.api.routes_prompts import store
+from app.core.logging import setup_logging, log_api_call
 
+
+setup_logging()
 predict_router = APIRouter(prefix="/v1")
 
-
-
 @predict_router.post("/predict", response_model=PredictResponse)
+@log_api_call
 def predict_prompt(
         req: PredictRequest,
         x_user_id: str = Header(default="user_anon"),
