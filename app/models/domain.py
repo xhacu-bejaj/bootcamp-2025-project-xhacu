@@ -1,8 +1,9 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import Any
+from jinja2 import Template
+# Assuming Jinja2 used for templating
 
 
-
-# TODO: create an experiment.py and see how jinja works
 @dataclass
 class Prompt:
     id: str
@@ -13,10 +14,12 @@ class Prompt:
     active: bool = False
     
     def update(self, template: str):
-        # self.template = template
-        # self.version += 1
+        self.template = template
+        self.version += 1
         ...
         
 
-    def render(self, **kwargs: str):
-        ...
+    def render(self, parameters: dict[str, Any])->str:
+        if self.template is not None:
+            template: Template = Template(self.template)
+        return template.render(parameters)
