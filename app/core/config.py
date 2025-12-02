@@ -2,9 +2,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     FILE_SNAPSHOT: bool = False
-    
     LOG_LEVEL: str = "INFO" 
-    #DB_PATH: str = 'promptlog.db'
+    DATABASE_URL: str = ''
     GOOGLE_API_KEY: str = ''
     OPENAI_API_KEY: str = ''
     DEEPSEEK_API_KEY: str = ''
