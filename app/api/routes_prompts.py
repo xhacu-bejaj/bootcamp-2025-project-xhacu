@@ -1,5 +1,7 @@
-from fastapi import APIRouter, FastAPI, Header, HTTPException
-
+from fastapi import APIRouter, FastAPI, Header, HTTPException, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
+from app.services.db import get_session
 
 from app.models.schemas import PromptCreate, PromptRead, PromptPatch, PredictRequest, PredictResponse
 from app.services.prompt_store import FileSnapshotStore, InMemoryStore, Purpose, UserId
@@ -25,7 +27,7 @@ def health():
 def create_prompt(
         data: PromptCreate,
         x_user_id: str = Header(default="user_anon")
-    ):
+    ):#->PromptRead:
         new_prompt = store.create(
             purpose=data.purpose,
             name = data.name,
@@ -75,3 +77,28 @@ def activate_prompt(
 def get_active(user_id: UserId, purpose: Purpose):
        return store.get_active(user_id=user_id, purpose=purpose)
     
+
+
+@prompt_router.get("/health/db", tags=["Database"])
+async def db_health_check(session: AsyncSession = Depends(get_session)):
+    """
+    Checks the database connection by executing a simple 'SELECT 1' query.
+    If the query executes successfully, the database connection is healthy.
+    """
+    try:
+        result = await session.execute(text("SELECT 1"))
+
+        if result.scalar_one() == 1:
+            return {
+                "status": "ok", 
+                "message": "Database connection is healthy and operational."
+            }
+        else:
+            raise Exception("Database returned an unexpected result.")
+            
+    except Exception as e:
+        print(f"Database health check failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database connection failed: {e.__class__.__name__}"
+        )
