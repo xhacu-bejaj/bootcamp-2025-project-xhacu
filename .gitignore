@@ -11,3 +11,6 @@ build/
 .DS_Store
 appunti.md
 *.log
+*.db
+*.ipynb
+*.ini
