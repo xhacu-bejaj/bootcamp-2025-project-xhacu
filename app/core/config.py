@@ -4,10 +4,14 @@ class Settings(BaseSettings):
     FILE_SNAPSHOT: bool = False
     
     LOG_LEVEL: str = "INFO" 
-    #DB_PATH: str = 'promptlog.db'
+    
+    DATABASE_URL: str = ''
+    ASYNC_DB: str = ''
+
     GOOGLE_API_KEY: str = ''
     OPENAI_API_KEY: str = ''
     DEEPSEEK_API_KEY: str = ''
+
     LOG_FILE_PATH: str = 'service-history.log'
     #MONGODB_CONNECTION_STRING: str = ''
     
