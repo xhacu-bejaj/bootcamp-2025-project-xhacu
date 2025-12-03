@@ -1,9 +1,8 @@
+import sys
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
-import logging
-import sys
-
 
 from app.core.logging import API_LOGGER
 
