@@ -15,12 +15,9 @@ from app.core.logging import setup_logging, log_api_call
 setup_logging()
 
 global_settings = config.Settings()
-# openai_logger = logging.getLogger("OPENAI")
-
 
 @dataclass
 class OpenaiLLM(LLMClient):
-    # Default model params if user does not specify any
     model: str = "gpt-4o-mini"
     temperature: float = 0.5
     provider_name: str = "openai"
