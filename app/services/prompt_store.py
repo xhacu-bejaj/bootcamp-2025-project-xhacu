@@ -167,8 +167,9 @@ class FileSnapshotStore(InMemoryStore):
                     (entry["user_id"], entry["purpose"]): entry["prompt_id"]
                     for entry in data.get("active_prompts", [])
                 }
-            except (json.JSONDecodeError, KeyError) as e:
-                print(f"Warning: Could not load {self.filepath}: {e}")
+            except (json.JSONDecodeError, KeyError, IOError, OSError) as e:
+                # If file is corrupted or unreadable, start with empty state
+                print(f"Warning: Could not load {self.filepath}: {e}. Starting with empty state.")
                 self._prompts = []
                 self._active_prompts = {}
 
@@ -177,34 +178,43 @@ class FileSnapshotStore(InMemoryStore):
         
         Serializes all prompts and active_prompts to JSON file.
         Creates parent directories if they don't exist.
+        
+        Raises:
+            IOError: If file cannot be written
         """
+        try:
+            # Create parent directory if filepath includes a directory
+            dir_path = os.path.dirname(self.filepath)
+            if dir_path:  # Only create if there's a directory component
+                os.makedirs(dir_path, exist_ok=True)
 
-        os.makedirs(os.path.dirname(self.filepath), exist_ok=True)
+            data = {
+                "prompts": [
+                    {
+                        "id": p.id,
+                        "purpose": p.purpose,
+                        "name": p.name,
+                        "template": p.template,
+                        "version": p.version,
+                        "active": p.active,
+                    }
+                    for p in self._prompts
+                ],
+                "active_prompts": [
+                    {
+                        "user_id": user_id,
+                        "purpose": purpose,
+                        "prompt_id": prompt_id,
+                    }
+                    for (user_id, purpose), prompt_id in self._active_prompts.items()
+                ],
+            }
 
-        data = {
-            "prompts": [
-                {
-                    "id": p.id,
-                    "purpose": p.purpose,
-                    "name": p.name,
-                    "template": p.template,
-                    "version": p.version,
-                    "active": p.active,
-                }
-                for p in self._prompts
-            ],
-            "active_prompts": [
-                {
-                    "user_id": user_id,
-                    "purpose": purpose,
-                    "prompt_id": prompt_id,
-                }
-                for (user_id, purpose), prompt_id in self._active_prompts.items()
-            ],
-        }
-
-        with open(self.filepath, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+            with open(self.filepath, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except (IOError, OSError) as e:
+            print(f"Error: Failed to save to {self.filepath}: {e}")
+            raise IOError(f"Failed to save prompts to {self.filepath}: {e}")
 
     def create(self, purpose: Purpose, name: str, template: str) -> Prompt:
         """Create a new prompt and save to file.
