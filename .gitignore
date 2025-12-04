@@ -9,6 +9,7 @@ var/
 dist/
 build/
 .DS_Store
+.vscode/
 appunti.md
 *.log
 *.db
