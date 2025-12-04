@@ -1,7 +1,6 @@
 from dataclasses import dataclass, asdict
 from typing import Any
 from jinja2 import Template
-# Assuming Jinja2 used for templating
 
 
 @dataclass
@@ -14,9 +13,13 @@ class Prompt:
     active: bool = False
 
     def update(self, template: str):
+        """Update the prompt template and increment version.
+        
+        Args:
+            template: New template string
+        """
         self.template = template
         self.version += 1
-        ...
 
     def model_dump(self) -> dict:
         """Convert dataclass to dictionary for Pydantic serialization."""
