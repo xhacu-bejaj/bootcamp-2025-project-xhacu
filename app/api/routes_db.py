@@ -18,15 +18,15 @@ async def db_health_check(session: AsyncSession = Depends(get_session)):
 
         if result.scalar_one() == 1:
             return {
-                "status": "ok", 
-                "message": "Database connection is healthy and operational."
+                "status": "ok",
+                "message": "Database connection is healthy and operational.",
             }
         else:
             raise Exception("Database returned an unexpected result.")
-            
+
     except Exception as e:
         print(f"Database health check failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Database connection failed: {e.__class__.__name__}"
+            detail=f"Database connection failed: {e.__class__.__name__}",
         )
