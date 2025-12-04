@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Header, HTTPException, Depends, status
+from fastapi import FastAPI, Header
 
 import uvicorn
 
@@ -7,7 +7,6 @@ from app.services.prompt_store import FileSnapshotStore, InMemoryStore
 from app.core.errors import http_exception_handler, generic_exception_handler
 from app.core.config import settings
 from app.core.logging import setup_logging
-
 
 
 
