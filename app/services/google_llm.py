@@ -20,7 +20,6 @@ setup_logging()
 
 @dataclass
 class GoogleLLM(LLMClient):
-    # Default model params if user does not specify any
     model: str='gemini-2.5-flash'
     temperature: float=0.5
     
@@ -30,20 +29,16 @@ class GoogleLLM(LLMClient):
         try:
             GOOGLE_API_KEY = global_settings.GOOGLE_API_KEY
         except Exception as e:
-            #google_logger.error("GOOGLE_API_KEY is not set in the environment")
             raise ValueError("GOOGLE_API_KEY is not set in the environment")
         
         if not GOOGLE_API_KEY:
-            #google_logger.error("GOOGLE_API_KEY is missing or empty.")
             raise ValueError("GOOGLE_API_KEY is missing or empty.")
         
         self.client = genai.Client(api_key=GOOGLE_API_KEY)
         self.config = GenerateContentConfig()
-        #google_logger.info(f"GoogleAIClient initialized with model: {self.model}")
+    
     @log_api_call
     def generate(self, active_prompt: Prompt, document_text: str, **kwargs) -> PredictResponse | None:
-        #google_logger.info(f"Generating content using Google client for prompt: '{prompt}...'")
-
         VALID_CONFIG_KEYS: Set[str] = {
         'temperature', 
         'max_output_tokens', 
@@ -93,15 +88,16 @@ class GoogleLLM(LLMClient):
             except Exception as e:
                 raise ValueError(f"LLM failed to return valid JSON conforming to PredictResponse schema: {e}. Raw Text: {json_string}")
         
-        predicted_response = PredictResponse(output_text=llm_output.output_text,
-                                        model_info=ModelInfo(
-                                        model=self.model,
-                                        temperature=final_temperature
-                                        ),
-                                        prompt_id=active_prompt.id, 
-                                        prompt_version=active_prompt.version, 
-                                        latency_ms=latency_ms
-                                        )
+        predicted_response = PredictResponse(
+            output_text=llm_output.output_text,
+            model_info=ModelInfo(
+                model=self.model,
+                temperature=final_temperature
+            ),
+            prompt_id=active_prompt.id,
+            prompt_version=active_prompt.version,
+            latency_ms=latency_ms
+        )
         return predicted_response
 
 
