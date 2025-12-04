@@ -5,6 +5,7 @@ from app.models.schemas import PredictResponse, LLMParams
 from .llm_client_factory import LLMClientFactory
 from .prompt_store import InMemoryStore, PromptStore, UserId
 from app.core.logging import setup_logging, log_api_call
+from app.services.llm_client import LLMClient
 
 
 
@@ -12,12 +13,12 @@ setup_logging()
 
 @log_api_call
 def process_document(
-        store: PromptStore, # our db where all the (active) prompts = purpose + template are stored
-        user_id: UserId, # needed for prompt retrieval
-        purpose: str, # needed for prompt retrieval (user_id, purpose) identifies a prompt
+        store: PromptStore,
+        user_id: UserId,
+        purpose: str, 
         document_text: str,
         provider: str,
-        **params, # model params
+        **params, 
     )-> PredictResponse | None:
 
     # Retrive the right active prompt
@@ -25,18 +26,14 @@ def process_document(
     
     # Instanciate the client selected by the user
     try:
-        llm_client = LLMClientFactory().create_client(provider)
+        llm_client: LLMClient = LLMClientFactory().create_client(provider)
     except ValueError as e:
-         raise HTTPException(status_code=400, detail=f"Invalid provider: {provider}. Must be one of 'mock', 'openai', or 'google'.")
+         raise ValueError(f"{e}: Invalid provider: {provider}. Must be one of 'mock', 'openai', or 'google'.")
     
     if active_prompt is not None: 
-        if active_prompt.template is not None:
-            
-            post_process_doc = llm_client.generate(active_prompt, document_text, **params)
-        else:
-            raise HTTPException(status_code=404, detail=f"Template not set for active prompt: {active_prompt.id}")
+        post_process_doc = llm_client.generate(active_prompt, document_text, **params)
     else:
-        raise HTTPException(status_code=404, detail=f"No active prompt found for user: {user_id}, purpose: {purpose}") 
+        raise ValueError(f"No active prompt found for user: {user_id}, purpose: {purpose}") 
     
     return post_process_doc
     
