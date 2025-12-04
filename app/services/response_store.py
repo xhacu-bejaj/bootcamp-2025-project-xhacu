@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
+
 from pymongo import MongoClient
 from app.core.config import global_settings
 from app.models.schemas import PredictResponse
@@ -9,7 +10,7 @@ from app.core.logging import log_api_call
 class ResponseStore:
     """Store LLM responses in MongoDB responses collection."""
 
-    def __init__(self, mongodb_uri: str = None):  # type: ignore
+    def __init__(self, mongodb_uri: Optional[str] = None):
         """Initialize MongoDB connection.
 
         Args:
