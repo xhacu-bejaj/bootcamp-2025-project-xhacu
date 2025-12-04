@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: bootcamp-app
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./var/app.db}
+      - MONGODB_URI=${MONGODB_URI}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - FILE_SNAPSHOT=${FILE_SNAPSHOT:-false}
+    volumes:
+      - ./var:/app/var
+      - ./activity.log:/app/activity.log
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+    networks:
+      - bootcamp-network
+
+  mongodb:
+    image: mongo:7.0
+    container_name: bootcamp-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=data
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    restart: unless-stopped
+    networks:
+      - bootcamp-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/data --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: bootcamp-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=bootcamp
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - bootcamp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  bootcamp-network:
+    driver: bridge
