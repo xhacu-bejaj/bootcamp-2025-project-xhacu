@@ -3,12 +3,24 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:latest
+        options: >-
+          --health-cmd mongosh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 27017:27017
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: '3.11'}
+        with: {python-version: '3.12'}
       - run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
+      - run: echo "MONGODB_URI=mongodb://localhost:27017/data" >> $GITHUB_ENV
       - run: pip install -r requirements.txt
-      - run: pip install pytest ruff httpx
-      - run: pytest -q
-      - run: ruff check .
+      - run: pip install pytest pytest-cov ruff httpx
+      - run: pytest -q --tb=short
+      - run: ruff check . --select=E,W,F
+      - run: ruff format . --check
