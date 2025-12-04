@@ -5,10 +5,7 @@ from typing import Dict, List, Optional, Tuple, TypeAlias
 from ..models.domain import Prompt
 from app.core.logging import setup_logging, log_api_call
 
-
-
 setup_logging()
-
 
 UserId: TypeAlias = str
 PromptId: TypeAlias = str
@@ -68,13 +65,10 @@ class PromptStore(ABC):
 
 class InMemoryStore(PromptStore):
     def __init__(self):
-        # This way the storage is independent of Prompt
-        # I can change the Prompt class and it doesn't affect the InMemoryStore
         self._prompts: List[Prompt] = []
-        # Contains only prompt_id because it should only do one thing: store a prompt as active for a user, nothing else
-        self._active_prompts:Dict[Tuple[UserId,Purpose], PromptId] = {} # Dict of associating user_id with its active_prompts
+        # Dict of associating user_id with its active_prompts
+        self._active_prompts:Dict[Tuple[UserId,Purpose], PromptId] = {} 
 
-    # Add checks, purpose, name, template cannot be None otherwise creation must fail
     @log_api_call
     def create(self, purpose: Purpose, name: str, template: str) -> Prompt:
         new_prompt = Prompt(str(uuid4()), purpose, name, template)
@@ -82,7 +76,7 @@ class InMemoryStore(PromptStore):
         return new_prompt
     
     @log_api_call
-    def list(self, purpose: Purpose | None) -> list[Prompt]: 
+    def list(self, purpose: Purpose) -> list[Prompt]: # | None
         return [p for p in self._prompts if p.purpose == purpose]
     
     @log_api_call
@@ -90,7 +84,7 @@ class InMemoryStore(PromptStore):
         return next((p for p in self._prompts if p.id == prompt_id), None)
     
     @log_api_call
-    def patch(self, prompt_id: PromptId, name: Optional[str], template: Optional[str]) -> Prompt | None:
+    def patch(self, prompt_id: PromptId, name: str | None = None, template: str | None = None) -> Prompt | None:
         for prompt in self._prompts:
             
             if prompt.id == prompt_id:
@@ -113,20 +107,23 @@ class InMemoryStore(PromptStore):
     
     @log_api_call
     def set_active(self, user_id: UserId, purpose: Purpose, prompt_id: PromptId) -> Prompt | None:
+        # Validate that the prompt exists
         new_active_prompt = next((p for p in self._prompts if p.id == prompt_id), None)
-    
-        if new_active_prompt is None: # raise exception and log
+        if new_active_prompt is None:
             return None
         
+        # Clear previous active status for this purpose
         active_key = (user_id, purpose)
+        old_prompt_id = self._active_prompts.get(active_key)
+        if old_prompt_id:
+            old_prompt = next((p for p in self._prompts if p.id == old_prompt_id), None)
+            if old_prompt:
+                old_prompt.active = False
         
-        if active_key in self._active_prompts:
-            return None
-        
-        self._active_prompts[active_key] = prompt_id 
-        
+        # Set new active prompt
+        self._active_prompts[active_key] = prompt_id
         new_active_prompt.active = True
-            
+        
         return new_active_prompt
 
     @log_api_call    
