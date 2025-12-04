@@ -24,15 +24,13 @@ class PromptPatch(BaseModel):
 
 class LLMParams(BaseModel):
     temperature: Optional[float] = None
-    # max_output_tokens: Optional[int] = None
     model_config = {"extra": "forbid"}
 
 
 class PredictRequest(BaseModel):
     purpose: str
     document_text: str
-    params: Optional[LLMParams] = None  # Optional[dict] = None
-    # provider: str = "mock"
+    params: Optional[LLMParams] = None 
     provider: str = "google"
 
 
