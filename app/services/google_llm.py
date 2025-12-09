@@ -9,12 +9,11 @@ from google.genai.types import GenerateContentConfig
 
 from app.models.domain import Prompt
 from app.services.llm_client import LLMClient
-from app.core import config
+from app.core.config import settings
 from app.models.schemas import ModelInfo, PredictResponse
 from app.core.logging import setup_logging, log_api_call
 
 
-global_settings = config.Settings()
 setup_logging()
 
 
@@ -26,7 +25,7 @@ class GoogleLLM(LLMClient):
     @log_api_call
     def __post_init__(self):
         try:
-            GOOGLE_API_KEY = global_settings.GOOGLE_API_KEY
+            GOOGLE_API_KEY = settings.GOOGLE_API_KEY
         except Exception:
             raise ValueError("GOOGLE_API_KEY is not set in the environment")
 
@@ -75,9 +74,12 @@ class GoogleLLM(LLMClient):
             )
         start_time = time.perf_counter()
         try:
+            # Render prompt template with Jinja2
+            rendered_prompt = active_prompt.render({"document_text": document_text})
+            
             response = self.client.models.generate_content(
                 model=self.model,
-                contents=f"{active_prompt.template}\n\n{document_text}",
+                contents=rendered_prompt,
                 config=config,
             )
             end_time = time.perf_counter()
