@@ -8,13 +8,11 @@ from openai import OpenAI
 from app.models.domain import Prompt
 from app.services.llm_client import LLMClient
 from app.models.schemas import ModelInfo, OpenaiOutputSchema, PredictResponse
-from app.core import config
+from app.core.config import settings
 from app.core.logging import setup_logging, log_api_call
 
 
 setup_logging()
-
-global_settings = config.Settings()
 
 @dataclass
 class OpenaiLLM(LLMClient):
@@ -25,7 +23,7 @@ class OpenaiLLM(LLMClient):
     @log_api_call
     def __post_init__(self):
         try:
-            OPENAI_API_KEY = global_settings.OPENAI_API_KEY
+            OPENAI_API_KEY = settings.OPENAI_API_KEY
         except Exception:
             raise ValueError("OPENAI_API_KEY is not set in the environment")
 
@@ -56,10 +54,14 @@ class OpenaiLLM(LLMClient):
             "Do not include any other keys, explanations, or text outside the JSON block."
         )
 
-        full_system_prompt = f"{active_prompt.template}\n\n{json_instruction}"
+        # Render prompt template with Jinja2
+        rendered_prompt = active_prompt.render({
+            "document_text": document_text,
+            "json_instruction": json_instruction
+        })
 
         messages = [
-            {"role": "system", "content": full_system_prompt},
+            {"role": "system", "content": rendered_prompt},
             {"role": "user", "content": document_text},
         ]
 
