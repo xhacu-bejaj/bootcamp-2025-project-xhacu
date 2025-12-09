@@ -60,3 +60,36 @@ class HistoryItem(BaseModel):
     provider: str
     model: str
     prompt_version: int
+
+
+class ChunkMetadataInput(BaseModel):
+    """Schema for chunk metadata input"""
+    source: Optional[str] = Field(None, description="Source document or identifier")
+    position: Optional[int] = Field(None, description="Position in the original document")
+
+
+class ChunkMetadata(BaseModel):
+    """Schema for chunk metadata response"""
+    length: int = Field(..., description="Length of the chunk text in characters")
+    source: Optional[str] = Field(None, description="Source document or identifier")
+    position: Optional[int] = Field(None, description="Position in the original document")
+
+
+class ChunkInsert(BaseModel):
+    """Schema for inserting a chunk into the vector database."""
+    text: str = Field(..., description="The text content of the chunk")
+    metadata: Optional[ChunkMetadataInput] = Field(None, description="Metadata associated with the chunk")
+
+
+class ChunkResponse(BaseModel):
+    """Schema for chunk retrieval response."""
+    id: str = Field(..., description="Unique identifier for the chunk")
+    text: str = Field(..., description="The text content of the chunk")
+    metadata: ChunkMetadata = Field(..., description="Metadata associated with the chunk")
+    distance: Optional[float] = Field(None, description="Distance/similarity score from query")
+
+
+class ChunkRetrieveRequest(BaseModel):
+    """Schema for chunk retrieval request."""
+    text: str = Field(..., description="Query text to find similar chunks")
+    n_chunks: int = Field(default=5, ge=1, le=100, description="Number of chunks to retrieve")
