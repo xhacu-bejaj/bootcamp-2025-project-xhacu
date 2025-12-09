@@ -27,7 +27,6 @@ chunk_router = APIRouter(prefix="/v1/chunks", tags=["chunks"])
         500: {"description": "Database insertion failed"}
     }
 )
-
 @log_api_call
 def insert_chunk(chunk_data: ChunkInsert) -> ChunkResponse:
     """
@@ -96,7 +95,6 @@ def insert_chunk(chunk_data: ChunkInsert) -> ChunkResponse:
         500: {"description": "Database query failed"}
     }
 )
-
 @log_api_call
 def retrieve_chunks(text: str, n_chunks: int = 5) -> List[ChunkResponse]:
     """
