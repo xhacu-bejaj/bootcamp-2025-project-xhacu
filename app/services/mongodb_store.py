@@ -1,67 +1,68 @@
-from typing import Optional, TypeAlias
+from typing import Optional, TypeAlias, List, Dict, Any
 from uuid import uuid4
+from datetime import datetime, timezone
+import csv
+import os
+from pathlib import Path
+
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError, ConnectionFailure
 
 from ..models.domain import Prompt
+from app.models.schemas import PredictResponse
 from app.core.logging import log_api_call
-from app.core.config import global_settings
+from app.core.config import settings
+from app.services.prompt_store import PromptStore
 
 UserId: TypeAlias = str
 PromptId: TypeAlias = str
 Purpose: TypeAlias = str
 
-
-class MongoDBStore:
+class MongoDBStore(PromptStore):
     """MongoDB-backed implementation of PromptStore interface."""
 
     def __init__(self, mongodb_uri: Optional[str] = None):
         """Initialize MongoDB connection and setup collections.
 
         Args:
-            mongodb_uri: Connection string for MongoDB. Defaults to global_settings.MONGODB_URI
+            mongodb_uri: Connection string for MongoDB. Defaults to settings.MONGODB_URI
 
         Raises:
             ValueError: If MONGODB_URI is not provided and not in settings
             ConnectionFailure: If unable to connect to MongoDB
         """
-        uri = mongodb_uri or global_settings.MONGODB_URI
+        uri = mongodb_uri or settings.MONGODB_URI
         if not uri:
             raise ValueError("MONGODB_URI must be provided or set in environment")
 
         try:
-            self.client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            # Verify connection
+            self.client: MongoClient = MongoClient(uri, serverSelectionTimeoutMS=5000)
             self.client.admin.command("ping")
         except (ServerSelectionTimeoutError, ConnectionFailure) as e:
             raise ConnectionFailure(f"Failed to connect to MongoDB at {uri}: {e}")
 
-        # Use configured DB and collection names when available (defaults match user-provided setup)
-        db_name = getattr(global_settings, "MONGODB_DB_NAME", "data")
+        db_name = getattr(settings, "MONGODB_DB_NAME", "data")
         prompts_col_name = getattr(
-            global_settings, "MONGODB_PROMPTS_COLLECTION", "prompts_db"
+            settings, "MONGODB_PROMPTS_COLLECTION", "prompts_db"
         )
         active_col_name = getattr(
-            global_settings, "MONGODB_ACTIVE_COLLECTION", "active_prompts"
+            settings, "MONGODB_ACTIVE_COLLECTION", "active_prompts"
         )
         self.db = self.client[db_name]
         self.prompts_collection = self.db[prompts_col_name]
-        # active_prompts is stored in a separate collection (created if missing)
         self.active_prompts_collection = self.db[active_col_name]
+        self.responses_collection = self.db["responses"]
 
-        # Create indexes for performance
         self._create_indexes()
 
     def _create_indexes(self):
         """Create indexes for common queries."""
-        # Index for listing prompts by purpose
         try:
             self.prompts_collection.create_index("purpose")
             self.prompts_collection.create_index([("purpose", 1), ("version", -1)])
         except Exception:
             pass
 
-        # Compound index for active prompt lookups
         try:
             self.active_prompts_collection.create_index(
                 [("user_id", 1), ("purpose", 1)], unique=True
@@ -69,7 +70,15 @@ class MongoDBStore:
         except Exception:
             pass
 
-    def _prompt_from_doc(self, doc: dict) -> Prompt:
+        try:
+            self.responses_collection.create_index([("prompt_id", 1), ("timestamp", -1)])
+            self.responses_collection.create_index(
+                [("user_id", 1), ("purpose", 1), ("timestamp", -1)]
+            )
+        except Exception:
+            pass
+
+    def _doc_to_prompt(self, doc: dict) -> Prompt: 
         """Convert MongoDB document to Prompt domain object."""
         return Prompt(
             id=str(doc["_id"]), 
@@ -83,7 +92,7 @@ class MongoDBStore:
     def _prompt_to_doc(self, prompt: Prompt) -> dict:
         """Convert Prompt domain object to MongoDB document."""
         return {
-            "_id": prompt.id,
+            "_id": prompt.id, 
             "purpose": prompt.purpose,
             "name": prompt.name,
             "template": prompt.template,
@@ -117,17 +126,18 @@ class MongoDBStore:
         return prompt
 
     @log_api_call
-    def list(self, purpose: Purpose) -> list[Prompt]:
+    def list(self, purpose: Purpose | None = None) -> list[Prompt]:
         """List all prompts for a given purpose.
 
         Args:
-            purpose: Filter prompts by this purpose
+            purpose: Filter prompts by this purpose. If None, returns all prompts.
 
         Returns:
             List of Prompt objects
         """
-        docs = self.prompts_collection.find({"purpose": purpose})
-        return [self._prompt_from_doc(doc) for doc in docs]
+        query = {"purpose": purpose} if purpose is not None else {}
+        docs = self.prompts_collection.find(query)
+        return [self._doc_to_prompt(doc) for doc in docs] 
 
     @log_api_call
     def get(self, prompt_id: PromptId) -> Prompt | None:
@@ -140,7 +150,7 @@ class MongoDBStore:
             Prompt object or None if not found
         """
         doc = self.prompts_collection.find_one({"_id": prompt_id})
-        return self._prompt_from_doc(doc) if doc else None
+        return self._doc_to_prompt(doc) if doc else None
 
     @log_api_call
     def patch(
@@ -171,7 +181,7 @@ class MongoDBStore:
                 return_document=True,
             )
 
-            return self._prompt_from_doc(result) if result else None
+            return self._doc_to_prompt(result) if result else None
 
         return self.get(prompt_id)
 
@@ -234,6 +244,134 @@ class MongoDBStore:
             return None
 
         return self.get(active_doc["prompt_id"])
+
+    @log_api_call
+    def store_response(
+        self, response: PredictResponse, user_id: str, purpose: str
+    ) -> None:
+        """Store an LLM response as a document in responses collection.
+
+        Args:
+            response: PredictResponse object from LLM
+            user_id: User who made the request
+            purpose: Prompt purpose (summarize, translate, etc.)
+        """
+        doc = {
+            "prompt_id": response.prompt_id,
+            "user_id": user_id,
+            "purpose": purpose,
+            "output_text": response.output_text,
+            "model_info": response.model_info.model_dump(),
+            "latency_ms": response.latency_ms,
+            "prompt_version": response.prompt_version,
+            "timestamp": datetime.now(timezone.utc),
+        }
+
+        self.responses_collection.insert_one(doc)
+
+    @log_api_call
+    def get_history(
+        self, limit: int = 50, purpose: Optional[str] = None, user_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get recent predictions from MongoDB.
+
+        Args:
+            limit: Maximum number of records to return (default 50)
+            purpose: Optional filter by purpose
+            user_id: Optional filter by user_id
+
+        Returns:
+            List of prediction records with timestamp, prompt_id, user_id, latency, provider/model
+        """
+        query = {}
+        if purpose:
+            query["purpose"] = purpose
+        if user_id:
+            query["user_id"] = user_id
+
+        cursor = (
+            self.responses_collection.find(query)
+            .sort("timestamp", -1)
+            .limit(limit)
+        )
+
+        results = []
+        for doc in cursor:
+            results.append(
+                {
+                    "timestamp": doc["timestamp"],
+                    "prompt_id": doc["prompt_id"],
+                    "user_id": doc["user_id"],
+                    "purpose": doc["purpose"],
+                    "latency_ms": doc["latency_ms"],
+                    "provider": doc["model_info"].get("model", "unknown"),
+                    "model": doc["model_info"].get("model", "unknown"),
+                    "prompt_version": doc.get("prompt_version", 1),
+                }
+            )
+        return results
+
+    @log_api_call
+    def export_prompt_usage_logs(
+        self, output_path: Optional[str] = None
+    ) -> str:
+        """Export prompt usage logs from responses collection to CSV.
+
+        Args:
+            output_path: Path where CSV file will be written.
+                        If None, uses var/exports/prompt_logs.csv (relative to project root)
+
+        Returns:
+            Path to the created CSV file
+
+        Raises:
+            IOError: If CSV file cannot be created
+        """
+
+        if output_path is None:
+            output_path = os.path.join("var", "exports", "prompt_logs.csv")
+
+        output_dir = os.path.dirname(output_path)
+        if output_dir:
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+        documents = list(self.responses_collection.find().sort("timestamp", -1))
+
+        fieldnames = [
+            "created_at",
+            "prompt_id",
+            "user_id",
+            "purpose",
+            "latency_ms",
+            "model_info",
+        ]
+
+        try:
+            with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
+                
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+
+                for doc in documents:
+
+                    model_info = doc.get("model_info", {})
+                    model_info_str = f"{model_info.get('model', 'unknown')};temp={model_info.get('temperature', 'N/A')}"
+                    
+                    row = {
+                        "created_at": doc.get("timestamp", "").isoformat()
+                        if doc.get("timestamp")
+                        else "",
+                        "prompt_id": doc.get("prompt_id", ""),
+                        "user_id": doc.get("user_id", ""),
+                        "purpose": doc.get("purpose", ""),
+                        "latency_ms": doc.get("latency_ms", 0),
+                        "model_info": model_info_str,
+                    }
+                    writer.writerow(row)
+
+            return output_path
+        except IOError as e:
+            raise IOError(f"Failed to write CSV file to {output_path}: {str(e)}")
 
     def close(self):
         """Close MongoDB connection."""
