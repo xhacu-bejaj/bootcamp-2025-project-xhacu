@@ -22,7 +22,7 @@ WORKDIR /app
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/var/exports && \
+    mkdir -p /app/var/exports /app/var/chroma_db && \
     chown -R appuser:appuser /app
 
 # Copy Python dependencies from builder
