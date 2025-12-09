@@ -26,15 +26,11 @@ def predict_prompt(
         store, x_user_id, purpose, document_text, provider, **llm_params_dict
     )
 
+    # Store response only if using MongoDB store
     if isinstance(store, MongoDBStore):
         try:
             store.store_response(post_process_doc, x_user_id, purpose)
         except Exception as e:
             print(f"Failed to store response: {e}")
-    else:
-        raise RuntimeError(
-            "Response tracking requires MongoDB store. "
-            "Please configure MONGODB_URI in your environment."
-        )
 
     return post_process_doc
