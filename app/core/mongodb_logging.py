@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from pymongo import MongoClient
-from app.core.config import global_settings
+from app.core.config import settings
 
 
 class MongoDBHandler(logging.Handler):
@@ -21,7 +21,7 @@ class MongoDBHandler(logging.Handler):
             ValueError: If mongodb_uri is not provided
         """
         super().__init__()
-        uri = mongodb_uri or global_settings.MONGODB_URI
+        uri = mongodb_uri or settings.MONGODB_URI
         if not uri:
             raise ValueError("MONGODB_URI must be provided or set in environment")
 
