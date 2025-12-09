@@ -6,7 +6,6 @@ from app.services.db import get_session
 from app.models.schemas import PromptCreate, PromptRead, PromptPatch
 from app.services.prompt_store import FileSnapshotStore, InMemoryStore, Purpose, UserId
 from app.services.mongodb_store import MongoDBStore
-from app.services.prompt_export import PromptExportService
 
 from app.core.config import settings
 from app.core.logging import setup_logging, log_api_call
@@ -15,16 +14,16 @@ from app.core.logging import setup_logging, log_api_call
 setup_logging()
 
 prompt_router = APIRouter(prefix="/v1")
-if settings.FILE_SNAPSHOT:
+
+if getattr(settings, "MONGODB_URI", None):
+    try:
+        store = MongoDBStore(mongodb_uri=settings.MONGODB_URI)
+    except Exception:
+        store = InMemoryStore()
+elif settings.FILE_SNAPSHOT:
     store = FileSnapshotStore()
 else:
-    if getattr(settings, "MONGODB_URI", None):
-        try:
-            store = MongoDBStore(mongodb_uri=settings.MONGODB_URI)
-        except Exception:
-            store = InMemoryStore()
-    else:
-        store = InMemoryStore()
+    store = InMemoryStore()
 
 
 @prompt_router.get("/health")
@@ -128,24 +127,20 @@ def export_prompt_logs(x_user_id: str = Header(default="user_anon")):
     Returns:
         dict with export_path and total_records exported
     """
-    try:
-        export_service = PromptExportService(
-            mongodb_uri=settings.MONGODB_URI
-        )
-        try:
-            export_path = export_service.export_prompt_usage_logs()
-            return {
-                "status": "success",
-                "export_path": export_path,
-                "message": "Prompt usage logs exported successfully",
-            }
-        finally:
-            export_service.close()
-    except ValueError as e:
+    # Check if using MongoDB store
+    if not isinstance(store, MongoDBStore):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Configuration error: {str(e)}",
+            detail="Export requires MongoDB store. Please configure MONGODB_URI in your environment.",
         )
+    
+    try:
+        export_path = store.export_prompt_usage_logs()
+        return {
+            "status": "success",
+            "export_path": export_path,
+            "message": "Prompt usage logs exported successfully",
+        }
     except IOError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -156,4 +151,5 @@ def export_prompt_logs(x_user_id: str = Header(default="user_anon")):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Unexpected error during export: {str(e)}",
         )
+
 

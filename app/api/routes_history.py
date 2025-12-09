@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Query
 from typing import List, Optional
+
+from fastapi import APIRouter, Query
+
 from app.models.schemas import HistoryItem
-from app.services.response_store import ResponseStore
-from app.core.config import global_settings
+from app.api.routes_prompts import store
+from app.services.mongodb_store import MongoDBStore
 from app.core.logging import log_api_call
 
 history_router = APIRouter(prefix="/v1", tags=["history"])
@@ -25,19 +27,21 @@ def get_history(
     Returns:
         List of recent predictions with timestamp, prompt_id, user_id, latency, provider/model
     """
-    # Convert empty strings to None for proper filtering
+
+    if not isinstance(store, MongoDBStore):
+        raise RuntimeError(
+            "History retrieval requires MongoDB store. "
+            "Please configure MONGODB_URI in your environment."
+        )
+    
     purpose_filter = purpose if purpose else None
     user_id_filter = user_id if user_id else None
     
-    store = ResponseStore(mongodb_uri=global_settings.MONGODB_URI)
-    try:
-        results = store.get_history(
-            limit=limit, purpose=purpose_filter, user_id=user_id_filter
-        )
-        # Convert datetime objects to ISO format strings
-        for item in results:
-            if "timestamp" in item and hasattr(item["timestamp"], "isoformat"):
-                item["timestamp"] = item["timestamp"].isoformat()
-        return results
-    finally:
-        store.close()
+    results = store.get_history(
+        limit=limit, purpose=purpose_filter, user_id=user_id_filter
+    )
+  
+    for item in results:
+        if "timestamp" in item and hasattr(item["timestamp"], "isoformat"):
+            item["timestamp"] = item["timestamp"].isoformat()
+    return results

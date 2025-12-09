@@ -3,18 +3,12 @@ from fastapi import APIRouter, Header
 from app.services.processor import process_document
 from app.models.schemas import PredictRequest, PredictResponse
 from app.api.routes_prompts import store
-from app.services.response_store import ResponseStore
+from app.services.mongodb_store import MongoDBStore
 from app.core.logging import setup_logging, log_api_call
 
 
 setup_logging()
 predict_router = APIRouter(prefix="/v1")
-
-# Initialize response store
-try:
-    response_store = ResponseStore()
-except Exception:
-    response_store = None
 
 
 @predict_router.post("/predict", response_model=PredictResponse)
@@ -32,12 +26,15 @@ def predict_prompt(
         store, x_user_id, purpose, document_text, provider, **llm_params_dict
     )
 
-    # Store response in MongoDB if response store is available
-    if response_store:
+    if isinstance(store, MongoDBStore):
         try:
-            response_store.store_response(post_process_doc, x_user_id, purpose)
+            store.store_response(post_process_doc, x_user_id, purpose)
         except Exception as e:
-            # Log but don't fail the request if storage fails
             print(f"Failed to store response: {e}")
+    else:
+        raise RuntimeError(
+            "Response tracking requires MongoDB store. "
+            "Please configure MONGODB_URI in your environment."
+        )
 
     return post_process_doc
