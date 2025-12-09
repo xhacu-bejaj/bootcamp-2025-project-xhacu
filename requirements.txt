@@ -20,6 +20,9 @@ psycopg-binary~=3.3
 pymongo~=4.15
 dnspython~=2.8
 
+# Vector Database
+chromadb~=0.5.23
+
 # LLM Providers
 openai~=2.8
 google-genai~=1.52
