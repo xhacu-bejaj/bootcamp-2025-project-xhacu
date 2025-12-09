@@ -17,24 +17,21 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 
 
-# store = FileSnapshotStore("var/data.json") if settings.FILE_SNAPSHOT else InMemoryStore()
 if settings.FILE_SNAPSHOT:
     store = FileSnapshotStore()
 else:
-    # Prefer MongoDBStore when a connection string is configured
     if getattr(settings, "MONGODB_URI", None):
         try:
             store = MongoDBStore(mongodb_uri=settings.MONGODB_URI)
         except Exception:
-            # Fall back to in-memory if MongoDB can't be used
             store = InMemoryStore()
     else:
         store = InMemoryStore()
+
 app = FastAPI(title="Prompted Doc Processor", version="0.1.0")
 
 # app.add_exception_handler(HTTPException, http_exception_handler)
 
-# Register the generic handler for all other Python Exceptions (5xx errors)
 app.add_exception_handler(Exception, generic_exception_handler)
 setup_logging()
 
