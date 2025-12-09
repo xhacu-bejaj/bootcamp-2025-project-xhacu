@@ -5,7 +5,7 @@ from app.models.domain import Prompt
 from app.services.google_llm import GoogleLLM
 
 
-@patch("app.services.google_llm.global_settings")
+@patch("app.services.google_llm.settings")
 @patch("app.services.google_llm.genai.Client")
 def test_google_llm_initialization(mock_client, mock_settings):
     mock_settings.GOOGLE_API_KEY = "test-api-key"
@@ -17,7 +17,7 @@ def test_google_llm_initialization(mock_client, mock_settings):
     mock_client.assert_called_once_with(api_key="test-api-key")
 
 
-@patch("app.services.google_llm.global_settings")
+@patch("app.services.google_llm.settings")
 @patch("app.services.google_llm.genai.Client")
 def test_google_llm_missing_api_key(mock_client, mock_settings):
     mock_settings.GOOGLE_API_KEY = None
@@ -26,7 +26,7 @@ def test_google_llm_missing_api_key(mock_client, mock_settings):
         GoogleLLM()
 
 
-@patch("app.services.google_llm.global_settings")
+@patch("app.services.google_llm.settings")
 @patch("app.services.google_llm.genai.Client")
 def test_google_llm_generate_success(mock_client, mock_settings):
     mock_settings.GOOGLE_API_KEY = "test-api-key"
@@ -56,7 +56,7 @@ def test_google_llm_generate_success(mock_client, mock_settings):
     assert result.prompt_id == "p1"
 
 
-@patch("app.services.google_llm.global_settings")
+@patch("app.services.google_llm.settings")
 @patch("app.services.google_llm.genai.Client")
 def test_google_llm_generate_with_temperature_override(mock_client, mock_settings):
     mock_settings.GOOGLE_API_KEY = "test-api-key"
@@ -85,7 +85,7 @@ def test_google_llm_generate_with_temperature_override(mock_client, mock_setting
     assert result.output_text == "High temperature response"
 
 
-@patch("app.services.google_llm.global_settings")
+@patch("app.services.google_llm.settings")
 @patch("app.services.google_llm.genai.Client")
 def test_google_llm_generate_invalid_json_response(mock_client, mock_settings):
     mock_settings.GOOGLE_API_KEY = "test-api-key"
@@ -111,7 +111,7 @@ def test_google_llm_generate_invalid_json_response(mock_client, mock_settings):
         llm.generate(prompt, "Test document")
 
 
-@patch("app.services.google_llm.global_settings")
+@patch("app.services.google_llm.settings")
 @patch("app.services.google_llm.genai.Client")
 def test_google_llm_config_key_filtering(mock_client, mock_settings):
     mock_settings.GOOGLE_API_KEY = "test-api-key"
@@ -139,7 +139,7 @@ def test_google_llm_config_key_filtering(mock_client, mock_settings):
     assert "top_p" in str(call_args) or "max_output_tokens" in str(call_args)
 
 
-@patch("app.services.google_llm.global_settings")
+@patch("app.services.google_llm.settings")
 @patch("app.services.google_llm.genai.Client")
 def test_google_llm_handles_client_exceptions(mock_client, mock_settings):
     mock_settings.GOOGLE_API_KEY = "test-api-key"
@@ -157,7 +157,7 @@ def test_google_llm_handles_client_exceptions(mock_client, mock_settings):
         llm.generate(prompt, "doc")
 
 
-@patch("app.services.google_llm.global_settings")
+@patch("app.services.google_llm.settings")
 @patch("app.services.google_llm.genai.Client")
 def test_google_llm_latency_is_int_and_nonnegative(mock_client, mock_settings):
     mock_settings.GOOGLE_API_KEY = "test-api-key"
@@ -184,7 +184,7 @@ def test_google_llm_latency_is_int_and_nonnegative(mock_client, mock_settings):
     assert result.latency_ms >= 0
 
 
-@patch("app.services.google_llm.global_settings")
+@patch("app.services.google_llm.settings")
 @patch("app.services.google_llm.genai.Client")
 def test_google_llm_temperature_default_and_override(mock_client, mock_settings):
     mock_settings.GOOGLE_API_KEY = "test-api-key"

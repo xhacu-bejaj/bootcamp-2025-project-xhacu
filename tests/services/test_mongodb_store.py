@@ -56,7 +56,7 @@ class TestMongoDBStoreInit:
 
     def test_init_missing_uri_raises_error(self):
         """Test that missing URI raises ValueError."""
-        with patch("app.services.mongodb_store.global_settings") as mock_settings:
+        with patch("app.services.mongodb_store.settings") as mock_settings:
             mock_settings.MONGODB_URI = ""
 
             with pytest.raises(ValueError, match="MONGODB_URI must be provided"):
@@ -143,6 +143,53 @@ class TestMongoDBStoreList:
         results = store.list("nonexistent")
 
         assert results == []
+
+    def test_list_all_prompts_when_purpose_is_none(self, mock_mongo_connection):
+        """Test listing all prompts when purpose is None."""
+        mocks = mock_mongo_connection
+
+        # Mock MongoDB documents with different purposes
+        mock_id1 = ObjectId()
+        mock_id2 = ObjectId()
+        mock_id3 = ObjectId()
+        mock_docs = [
+            {
+                "_id": mock_id1,
+                "purpose": "summarize",
+                "name": "Summarizer",
+                "template": "Summarize: {{text}}",
+                "version": 1,
+                "active": False,
+            },
+            {
+                "_id": mock_id2,
+                "purpose": "translate",
+                "name": "Translator",
+                "template": "Translate: {{text}}",
+                "version": 1,
+                "active": False,
+            },
+            {
+                "_id": mock_id3,
+                "purpose": "extract",
+                "name": "Extractor",
+                "template": "Extract: {{text}}",
+                "version": 1,
+                "active": False,
+            },
+        ]
+        mocks["prompts_col"].find = MagicMock(return_value=mock_docs)
+
+        store = MongoDBStore(mongodb_uri="mongodb://localhost:27017/testdb")
+        results = store.list(None)
+
+        assert len(results) == 3
+        assert all(isinstance(p, Prompt) for p in results)
+        # Verify we have different purposes
+        purposes = {p.purpose for p in results}
+        assert purposes == {"summarize", "translate", "extract"}
+        # Verify find was called with empty query (no purpose filter)
+        mocks["prompts_col"].find.assert_called_with({})
 
 
 class TestMongoDBStoreGet:
@@ -403,3 +450,373 @@ class TestMongoDBStoreErrorHandling:
         assert len(results) == 2
         assert results[0].version == 1
         assert results[1].version == 2
+
+
+class TestStoreResponse:
+    """Tests for store_response method."""
+
+    def test_store_response_success(self, mock_mongo_connection):
+        """Test successfully storing a response."""
+        from app.models.schemas import PredictResponse, ModelInfo
+        from datetime import datetime
+        
+        mocks = mock_mongo_connection
+        mock_responses_col = MagicMock()
+        
+        def get_collection(col_name):
+            if "prompts" in col_name:
+                return mocks["prompts_col"]
+            elif "active" in col_name:
+                return mocks["active_col"]
+            elif "responses" in col_name:
+                return mock_responses_col
+            return MagicMock()
+        
+        mocks["db"].__getitem__ = MagicMock(side_effect=get_collection)
+        
+        store = MongoDBStore(mongodb_uri="mongodb://localhost:27017/testdb")
+        
+        response = PredictResponse(
+            output_text="Test output",
+            model_info=ModelInfo(model="gpt-4", temperature=0.7),
+            prompt_id="prompt123",
+            prompt_version=2,
+            latency_ms=150
+        )
+        
+        # Should not raise
+        store.store_response(response, "user123", "translate")
+        
+        # Verify insert_one was called
+        assert mock_responses_col.insert_one.called
+
+    def test_store_response_includes_timestamp(self, mock_mongo_connection):
+        """Test that stored response includes timestamp."""
+        from app.models.schemas import PredictResponse, ModelInfo
+        from datetime import datetime
+        
+        mocks = mock_mongo_connection
+        mock_responses_col = MagicMock()
+        
+        def get_collection(col_name):
+            if "prompts" in col_name:
+                return mocks["prompts_col"]
+            elif "active" in col_name:
+                return mocks["active_col"]
+            elif "responses" in col_name:
+                return mock_responses_col
+            return MagicMock()
+        
+        mocks["db"].__getitem__ = MagicMock(side_effect=get_collection)
+        
+        store = MongoDBStore(mongodb_uri="mongodb://localhost:27017/testdb")
+        
+        response = PredictResponse(
+            output_text="Test",
+            model_info=ModelInfo(model="gpt-4", temperature=0.5),
+            prompt_id="p1",
+            prompt_version=1,
+            latency_ms=100
+        )
+        
+        store.store_response(response, "user1", "summarize")
+        
+        # Get the call args
+        call_args = mock_responses_col.insert_one.call_args[0][0]
+        assert "timestamp" in call_args
+        assert isinstance(call_args["timestamp"], datetime)
+
+    def test_store_response_includes_all_fields(self, mock_mongo_connection):
+        """Test that all required fields are stored."""
+        from app.models.schemas import PredictResponse, ModelInfo
+        
+        mocks = mock_mongo_connection
+        mock_responses_col = MagicMock()
+        
+        def get_collection(col_name):
+            if "prompts" in col_name:
+                return mocks["prompts_col"]
+            elif "active" in col_name:
+                return mocks["active_col"]
+            elif "responses" in col_name:
+                return mock_responses_col
+            return MagicMock()
+        
+        mocks["db"].__getitem__ = MagicMock(side_effect=get_collection)
+        
+        store = MongoDBStore(mongodb_uri="mongodb://localhost:27017/testdb")
+        
+        response = PredictResponse(
+            output_text="Output text",
+            model_info=ModelInfo(model="gpt-4o", temperature=0.8),
+            prompt_id="prompt_abc",
+            prompt_version=3,
+            latency_ms=200
+        )
+        
+        store.store_response(response, "user_test", "extract")
+        
+        call_args = mock_responses_col.insert_one.call_args[0][0]
+        assert call_args["prompt_id"] == "prompt_abc"
+        assert call_args["user_id"] == "user_test"
+        assert call_args["purpose"] == "extract"
+        assert call_args["latency_ms"] == 200
+        assert call_args["model_info"]["model"] == "gpt-4o"
+        assert call_args["model_info"]["temperature"] == 0.8
+        assert call_args["prompt_version"] == 3
+
+
+class TestGetHistory:
+    """Tests for get_history method."""
+
+    def test_get_history_default_params(self, mock_mongo_connection):
+        """Test get_history with default parameters."""
+        from datetime import datetime, timezone
+        
+        mocks = mock_mongo_connection
+        mock_responses_col = MagicMock()
+        
+        # Mock response data
+        mock_docs = [
+            {
+                "timestamp": datetime.now(timezone.utc),
+                "prompt_id": "p1",
+                "user_id": "u1",
+                "purpose": "translate",
+                "latency_ms": 100,
+                "model_info": {"model": "gpt-4", "temperature": 0.5},
+                "prompt_version": 1
+            }
+        ]
+        mock_responses_col.find.return_value.sort.return_value.limit.return_value = mock_docs
+        
+        def get_collection(col_name):
+            if "prompts" in col_name:
+                return mocks["prompts_col"]
+            elif "active" in col_name:
+                return mocks["active_col"]
+            elif "responses" in col_name:
+                return mock_responses_col
+            return MagicMock()
+        
+        mocks["db"].__getitem__ = MagicMock(side_effect=get_collection)
+        
+        store = MongoDBStore(mongodb_uri="mongodb://localhost:27017/testdb")
+        results = store.get_history()
+        
+        assert len(results) == 1
+        assert results[0]["prompt_id"] == "p1"
+        # Verify query was made with no filters
+        mock_responses_col.find.assert_called_once_with({})
+
+    def test_get_history_with_purpose_filter(self, mock_mongo_connection):
+        """Test get_history filtered by purpose."""
+        from datetime import datetime, timezone
+        
+        mocks = mock_mongo_connection
+        mock_responses_col = MagicMock()
+        
+        mock_docs = [
+            {
+                "timestamp": datetime.now(timezone.utc),
+                "prompt_id": "p1",
+                "user_id": "u1",
+                "purpose": "summarize",
+                "latency_ms": 150,
+                "model_info": {"model": "gemini-pro", "temperature": 0.7},
+                "prompt_version": 2
+            }
+        ]
+        mock_responses_col.find.return_value.sort.return_value.limit.return_value = mock_docs
+        
+        def get_collection(col_name):
+            if "prompts" in col_name:
+                return mocks["prompts_col"]
+            elif "active" in col_name:
+                return mocks["active_col"]
+            elif "responses" in col_name:
+                return mock_responses_col
+            return MagicMock()
+        
+        mocks["db"].__getitem__ = MagicMock(side_effect=get_collection)
+        
+        store = MongoDBStore(mongodb_uri="mongodb://localhost:27017/testdb")
+        results = store.get_history(limit=10, purpose="summarize")
+        
+        # Verify query included purpose filter
+        call_args = mock_responses_col.find.call_args[0][0]
+        assert call_args["purpose"] == "summarize"
+
+    def test_get_history_with_both_filters(self, mock_mongo_connection):
+        """Test get_history with both purpose and user_id filters."""
+        mocks = mock_mongo_connection
+        mock_responses_col = MagicMock()
+        
+        mock_responses_col.find.return_value.sort.return_value.limit.return_value = []
+        
+        def get_collection(col_name):
+            if "prompts" in col_name:
+                return mocks["prompts_col"]
+            elif "active" in col_name:
+                return mocks["active_col"]
+            elif "responses" in col_name:
+                return mock_responses_col
+            return MagicMock()
+        
+        mocks["db"].__getitem__ = MagicMock(side_effect=get_collection)
+        
+        store = MongoDBStore(mongodb_uri="mongodb://localhost:27017/testdb")
+        store.get_history(purpose="extract", user_id="user123", limit=5)
+        
+        call_args = mock_responses_col.find.call_args[0][0]
+        assert call_args["purpose"] == "extract"
+        assert call_args["user_id"] == "user123"
+
+    def test_get_history_respects_limit(self, mock_mongo_connection):
+        """Test that get_history respects the limit parameter."""
+        mocks = mock_mongo_connection
+        mock_responses_col = MagicMock()
+        
+        mock_responses_col.find.return_value.sort.return_value.limit.return_value = []
+        
+        def get_collection(col_name):
+            if "prompts" in col_name:
+                return mocks["prompts_col"]
+            elif "active" in col_name:
+                return mocks["active_col"]
+            elif "responses" in col_name:
+                return mock_responses_col
+            return MagicMock()
+        
+        mocks["db"].__getitem__ = MagicMock(side_effect=get_collection)
+        
+        store = MongoDBStore(mongodb_uri="mongodb://localhost:27017/testdb")
+        store.get_history(limit=25)
+        
+        # Verify limit was applied
+        mock_responses_col.find.return_value.sort.return_value.limit.assert_called_once_with(25)
+
+
+class TestExportPromptUsageLogs:
+    """Tests for export_prompt_usage_logs method."""
+
+    def test_export_creates_csv_file(self, mock_mongo_connection, tmp_path):
+        """Test that export creates a CSV file."""
+        from datetime import datetime, timezone
+        
+        mocks = mock_mongo_connection
+        mock_responses_col = MagicMock()
+        
+        # Mock response data
+        mock_docs = [
+            {
+                "_id": ObjectId(),
+                "timestamp": datetime(2025, 12, 9, 10, 0, 0, tzinfo=timezone.utc),
+                "prompt_id": "p1",
+                "user_id": "u1",
+                "purpose": "translate",
+                "latency_ms": 100,
+                "provider": "openai",
+                "model": "gpt-4",
+                "prompt_version": 1
+            }
+        ]
+        mock_responses_col.find.return_value.sort.return_value = mock_docs
+        
+        def get_collection(col_name):
+            if "prompts" in col_name:
+                return mocks["prompts_col"]
+            elif "active" in col_name:
+                return mocks["active_col"]
+            elif "responses" in col_name:
+                return mock_responses_col
+            return MagicMock()
+        
+        mocks["db"].__getitem__ = MagicMock(side_effect=get_collection)
+        
+        store = MongoDBStore(mongodb_uri="mongodb://localhost:27017/testdb")
+        
+        output_path = str(tmp_path / "test_export.csv")
+        result_path = store.export_prompt_usage_logs(output_path=output_path)
+        
+        assert result_path == output_path
+        # Verify CSV file was created
+        import os
+        assert os.path.exists(result_path)
+
+    def test_export_includes_all_columns(self, mock_mongo_connection, tmp_path):
+        """Test that exported CSV includes all required columns."""
+        from datetime import datetime, timezone
+        
+        mocks = mock_mongo_connection
+        mock_responses_col = MagicMock()
+        
+        mock_docs = [
+            {
+                "_id": ObjectId(),
+                "timestamp": datetime.now(timezone.utc),
+                "prompt_id": "p1",
+                "user_id": "u1",
+                "purpose": "test",
+                "latency_ms": 100,
+                "provider": "mock",
+                "model": "mock",
+                "prompt_version": 1
+            }
+        ]
+        mock_responses_col.find.return_value.sort.return_value = mock_docs
+        
+        def get_collection(col_name):
+            if "prompts" in col_name:
+                return mocks["prompts_col"]
+            elif "active" in col_name:
+                return mocks["active_col"]
+            elif "responses" in col_name:
+                return mock_responses_col
+            return MagicMock()
+        
+        mocks["db"].__getitem__ = MagicMock(side_effect=get_collection)
+        
+        store = MongoDBStore(mongodb_uri="mongodb://localhost:27017/testdb")
+        
+        output_path = str(tmp_path / "export.csv")
+        store.export_prompt_usage_logs(output_path=output_path)
+        
+        # Read CSV and verify columns
+        import csv
+        with open(output_path, 'r') as f:
+            reader = csv.DictReader(f)
+            headers = reader.fieldnames
+            assert "created_at" in headers
+            assert "prompt_id" in headers
+            assert "user_id" in headers
+            assert "purpose" in headers
+            assert "latency_ms" in headers
+            assert "model_info" in headers
+
+    def test_export_handles_empty_collection(self, mock_mongo_connection, tmp_path):
+        """Test export with no documents."""
+        mocks = mock_mongo_connection
+        mock_responses_col = MagicMock()
+        
+        mock_responses_col.find.return_value.sort.return_value = []
+        
+        def get_collection(col_name):
+            if "prompts" in col_name:
+                return mocks["prompts_col"]
+            elif "active" in col_name:
+                return mocks["active_col"]
+            elif "responses" in col_name:
+                return mock_responses_col
+            return MagicMock()
+        
+        mocks["db"].__getitem__ = MagicMock(side_effect=get_collection)
+        
+        store = MongoDBStore(mongodb_uri="mongodb://localhost:27017/testdb")
+        
+        output_path = str(tmp_path / "empty_export.csv")
+        result = store.export_prompt_usage_logs(output_path=output_path)
+        
+        # File should still be created with headers
+        import os
+        assert os.path.exists(result)

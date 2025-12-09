@@ -5,7 +5,7 @@ from app.models.domain import Prompt
 from app.services.openai_llm import OpenaiLLM
 
 
-@patch("app.services.openai_llm.global_settings")
+@patch("app.services.openai_llm.settings")
 @patch("app.services.openai_llm.OpenAI")
 def test_openai_llm_initialization(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "openai-key"
@@ -15,7 +15,7 @@ def test_openai_llm_initialization(mock_openai, mock_settings):
     mock_openai.assert_called_once_with(api_key="openai-key")
 
 
-@patch("app.services.openai_llm.global_settings")
+@patch("app.services.openai_llm.settings")
 @patch("app.services.openai_llm.OpenAI")
 def test_openai_llm_missing_api_key(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = None
@@ -23,7 +23,7 @@ def test_openai_llm_missing_api_key(mock_openai, mock_settings):
         OpenaiLLM()
 
 
-@patch("app.services.openai_llm.global_settings")
+@patch("app.services.openai_llm.settings")
 @patch("app.services.openai_llm.OpenAI")
 def test_openai_llm_generate_success(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "openai-key"
@@ -50,7 +50,7 @@ def test_openai_llm_generate_success(mock_openai, mock_settings):
     assert res.model_info.model == llm.model
 
 
-@patch("app.services.openai_llm.global_settings")
+@patch("app.services.openai_llm.settings")
 @patch("app.services.openai_llm.OpenAI")
 def test_openai_llm_generate_with_temperature_override(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "openai-key"
@@ -76,7 +76,7 @@ def test_openai_llm_generate_with_temperature_override(mock_openai, mock_setting
     assert res.output_text == "creative output"
 
 
-@patch("app.services.openai_llm.global_settings")
+@patch("app.services.openai_llm.settings")
 @patch("app.services.openai_llm.OpenAI")
 def test_openai_llm_api_error_raises_http_exception(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "openai-key"
@@ -94,7 +94,7 @@ def test_openai_llm_api_error_raises_http_exception(mock_openai, mock_settings):
         llm.generate(prompt, "doc")
 
 
-@patch("app.services.openai_llm.global_settings")
+@patch("app.services.openai_llm.settings")
 @patch("app.services.openai_llm.OpenAI")
 def test_openai_llm_system_prompt_composition(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "test-api-key"
@@ -123,7 +123,7 @@ def test_openai_llm_system_prompt_composition(mock_openai, mock_settings):
     assert any("Compose: " in str(m) for m in messages)
 
 
-@patch("app.services.openai_llm.global_settings")
+@patch("app.services.openai_llm.settings")
 @patch("app.services.openai_llm.OpenAI")
 def test_openai_llm_api_params_forwarding(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "test-api-key"
@@ -149,7 +149,7 @@ def test_openai_llm_api_params_forwarding(mock_openai, mock_settings):
     assert kwargs.get("frequency_penalty") == 0.2
 
 
-@patch("app.services.openai_llm.global_settings")
+@patch("app.services.openai_llm.settings")
 @patch("app.services.openai_llm.OpenAI")
 def test_openai_llm_handles_null_response(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "test-api-key"
@@ -170,7 +170,7 @@ def test_openai_llm_handles_null_response(mock_openai, mock_settings):
         llm.generate(prompt, "doc")
 
 
-@patch("app.services.openai_llm.global_settings")
+@patch("app.services.openai_llm.settings")
 @patch("app.services.openai_llm.OpenAI")
 def test_openai_llm_invalid_json_response(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "test-api-key"
@@ -191,7 +191,7 @@ def test_openai_llm_invalid_json_response(mock_openai, mock_settings):
         llm.generate(prompt, "doc")
 
 
-@patch("app.services.openai_llm.global_settings")
+@patch("app.services.openai_llm.settings")
 @patch("app.services.openai_llm.OpenAI")
 def test_openai_llm_api_exception_handling(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "test-api-key"
@@ -215,7 +215,7 @@ def test_openai_llm_api_exception_handling(mock_openai, mock_settings):
         llm.generate(prompt, "doc")
 
 
-@patch("app.services.openai_llm.global_settings")
+@patch("app.services.openai_llm.settings")
 @patch("app.services.openai_llm.OpenAI")
 def test_openai_llm_response_format_override(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "test-api-key"
