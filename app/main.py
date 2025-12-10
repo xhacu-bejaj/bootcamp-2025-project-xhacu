@@ -20,9 +20,10 @@ from app.core.logging import setup_logging
 if settings.FILE_SNAPSHOT:
     store = FileSnapshotStore()
 else:
-    if getattr(settings, "MONGODB_URI", None):
+    mongodb_uri = getattr(settings, "MONGODB_URI", None)
+    if mongodb_uri and mongodb_uri.strip():
         try:
-            store = MongoDBStore(mongodb_uri=settings.MONGODB_URI)
+            store = MongoDBStore(mongodb_uri=mongodb_uri)
         except Exception:
             store = InMemoryStore()
     else:
