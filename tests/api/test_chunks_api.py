@@ -11,12 +11,6 @@ from app.services.chunk_store import get_chunk_store
 
 
 @pytest.fixture
-def client():
-    """Create a test client."""
-    return TestClient(app)
-
-
-@pytest.fixture(autouse=True)
 def clear_chunk_store():
     """Clear the chunk store before and after each test."""
     store = get_chunk_store()
@@ -28,7 +22,7 @@ def clear_chunk_store():
 class TestChunkInsertAPI:
     """Tests for POST /v1/chunks/insert endpoint."""
 
-    def test_insert_chunk_success(self, client):
+    def test_insert_chunk_success(self, client, clear_chunk_store):
         """Test successfully inserting a chunk."""
         payload = {
             "text": "This is a test chunk for the API.",
@@ -49,7 +43,7 @@ class TestChunkInsertAPI:
         assert data["metadata"]["position"] == 0
         assert data["distance"] is None
 
-    def test_insert_chunk_without_metadata(self, client):
+    def test_insert_chunk_without_metadata(self, client, clear_chunk_store):
         """Test inserting a chunk without metadata."""
         payload = {
             "text": "Simple chunk without metadata."
@@ -65,7 +59,7 @@ class TestChunkInsertAPI:
         assert data["metadata"]["source"] is None
         assert data["metadata"]["position"] is None
 
-    def test_insert_chunk_exceeds_max_length(self, client):
+    def test_insert_chunk_exceeds_max_length(self, client, clear_chunk_store):
         """Test that inserting a chunk exceeding max length returns 400."""
         payload = {
             "text": "x" * 1001  # Exceeds MAX_CHUNK_LENGTH of 1000
@@ -76,7 +70,7 @@ class TestChunkInsertAPI:
         assert response.status_code == 400
         assert "exceeds maximum length" in response.json()["detail"]
 
-    def test_insert_chunk_missing_text(self, client):
+    def test_insert_chunk_missing_text(self, client, clear_chunk_store):
         """Test that missing text field returns 422."""
         payload = {
             "metadata": {"source": "test"}
@@ -86,7 +80,7 @@ class TestChunkInsertAPI:
         
         assert response.status_code == 422
 
-    def test_insert_multiple_chunks(self, client):
+    def test_insert_multiple_chunks(self, client, clear_chunk_store):
         """Test inserting multiple chunks."""
         chunks = [
             {"text": "First chunk"},
@@ -107,7 +101,7 @@ class TestChunkInsertAPI:
 class TestChunkRetrieveAPI:
     """Tests for GET /v1/chunks/retrieve endpoint."""
 
-    def test_retrieve_chunks_success(self, client):
+    def test_retrieve_chunks_success(self, client, clear_chunk_store):
         """Test successfully retrieving chunks."""
         # Insert test chunks
         chunks_data = [
@@ -130,7 +124,7 @@ class TestChunkRetrieveAPI:
         assert all("text" in chunk for chunk in data)
         assert all("metadata" in chunk for chunk in data)
 
-    def test_retrieve_chunks_default_limit(self, client):
+    def test_retrieve_chunks_default_limit(self, client, clear_chunk_store):
         """Test that default n_chunks is 5."""
         # Insert 10 chunks
         for i in range(10):
@@ -143,7 +137,7 @@ class TestChunkRetrieveAPI:
         data = response.json()
         assert len(data) == 5  # Default limit
 
-    def test_retrieve_chunks_custom_limit(self, client):
+    def test_retrieve_chunks_custom_limit(self, client, clear_chunk_store):
         """Test retrieving with custom n_chunks."""
         # Insert 5 chunks
         for i in range(5):
@@ -156,7 +150,7 @@ class TestChunkRetrieveAPI:
         data = response.json()
         assert len(data) == 2
 
-    def test_retrieve_chunks_empty_database(self, client):
+    def test_retrieve_chunks_empty_database(self, client, clear_chunk_store):
         """Test retrieving from empty database."""
         response = client.get("/v1/chunks/retrieve?text=anything&n_chunks=5")
         
@@ -164,20 +158,20 @@ class TestChunkRetrieveAPI:
         data = response.json()
         assert data == []
 
-    def test_retrieve_chunks_missing_text(self, client):
+    def test_retrieve_chunks_missing_text(self, client, clear_chunk_store):
         """Test that missing text parameter returns 422."""
         response = client.get("/v1/chunks/retrieve?n_chunks=5")
         
         assert response.status_code == 422
 
-    def test_retrieve_chunks_empty_text(self, client):
+    def test_retrieve_chunks_empty_text(self, client, clear_chunk_store):
         """Test that empty text parameter returns 400."""
         response = client.get("/v1/chunks/retrieve?text=&n_chunks=5")
         
         assert response.status_code == 400
         assert "empty" in response.json()["detail"].lower()
 
-    def test_retrieve_chunks_invalid_n_chunks_too_low(self, client):
+    def test_retrieve_chunks_invalid_n_chunks_too_low(self, client, clear_chunk_store):
         """Test that n_chunks < 1 returns 400."""
         client.post("/v1/chunks/insert", json={"text": "Test"})
         
@@ -186,7 +180,7 @@ class TestChunkRetrieveAPI:
         assert response.status_code == 400
         assert "must be between 1 and 100" in response.json()["detail"]
 
-    def test_retrieve_chunks_invalid_n_chunks_too_high(self, client):
+    def test_retrieve_chunks_invalid_n_chunks_too_high(self, client, clear_chunk_store):
         """Test that n_chunks > 100 returns 400."""
         client.post("/v1/chunks/insert", json={"text": "Test"})
         
@@ -195,7 +189,7 @@ class TestChunkRetrieveAPI:
         assert response.status_code == 400
         assert "must be between 1 and 100" in response.json()["detail"]
 
-    def test_retrieve_chunks_includes_distance(self, client):
+    def test_retrieve_chunks_includes_distance(self, client, clear_chunk_store):
         """Test that retrieved chunks include distance information."""
         client.post("/v1/chunks/insert", json={"text": "Sample text for testing"})
         
@@ -207,7 +201,7 @@ class TestChunkRetrieveAPI:
         # Distance can be None or a float value
         assert "distance" in data[0]
 
-    def test_retrieve_chunks_preserves_metadata(self, client):
+    def test_retrieve_chunks_preserves_metadata(self, client, clear_chunk_store):
         """Test that retrieved chunks preserve metadata."""
         payload = {
             "text": "Test chunk with metadata",
@@ -231,7 +225,7 @@ class TestChunkRetrieveAPI:
 class TestChunkAPIIntegration:
     """Integration tests for chunk API endpoints."""
 
-    def test_insert_and_retrieve_workflow(self, client):
+    def test_insert_and_retrieve_workflow(self, client, clear_chunk_store):
         """Test complete workflow of inserting and retrieving chunks."""
         documents = [
             {"text": "Python is great for data science and machine learning."},
@@ -254,7 +248,7 @@ class TestChunkAPIIntegration:
         assert len(data) <= 2
         assert all(chunk["id"] in inserted_ids for chunk in data)
 
-    def test_multiple_inserts_and_retrieval(self, client):
+    def test_multiple_inserts_and_retrieval(self, client, clear_chunk_store):
         """Test inserting many chunks and retrieving subsets."""
         # Insert 20 chunks
         for i in range(20):
