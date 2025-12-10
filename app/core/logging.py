@@ -41,9 +41,10 @@ def setup_logging() -> logging.Logger:
             from app.core.mongodb_logging import MongoDBHandler
             from app.core.config import settings
 
-            mongodb_handler = MongoDBHandler(settings.MONGODB_URI)
-            mongodb_handler.setFormatter(formatter)
-            logger.addHandler(mongodb_handler)
+            if settings.MONGODB_URI and settings.MONGODB_URI.strip():
+                mongodb_handler = MongoDBHandler(settings.MONGODB_URI)
+                mongodb_handler.setFormatter(formatter)
+                logger.addHandler(mongodb_handler)
         except Exception:
             # Silently skip MongoDB logging if connection fails
             pass
