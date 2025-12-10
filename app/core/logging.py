@@ -39,9 +39,9 @@ def setup_logging() -> logging.Logger:
         # Add MongoDB logging handler
         try:
             from app.core.mongodb_logging import MongoDBHandler
-            from app.core.config import global_settings
+            from app.core.config import settings
 
-            mongodb_handler = MongoDBHandler(global_settings.MONGODB_URI)
+            mongodb_handler = MongoDBHandler(settings.MONGODB_URI)
             mongodb_handler.setFormatter(formatter)
             logger.addHandler(mongodb_handler)
         except Exception:
