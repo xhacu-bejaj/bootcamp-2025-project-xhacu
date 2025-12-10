@@ -12,9 +12,10 @@ from app.main import app
 def client():
     return TestClient(app)
 
-@pytest.fixture(scope="function", autouse=True)
+
+@pytest.fixture(scope="session", autouse=True)
 def setup_translate_prompt(client):
-    """Automatically setup a translate prompt for all tests that need it"""
+    """Setup a translate prompt once for all tests"""
     prompt_payload = {
         "purpose": "translate",
         "name": "Translator",
