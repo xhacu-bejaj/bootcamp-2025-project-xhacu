@@ -15,15 +15,8 @@ setup_logging()
 
 prompt_router = APIRouter(prefix="/v1")
 
-if getattr(settings, "MONGODB_URI", None):
-    try:
-        store = MongoDBStore(mongodb_uri=settings.MONGODB_URI)
-    except Exception:
-        store = InMemoryStore()
-elif settings.FILE_SNAPSHOT:
-    store = FileSnapshotStore()
-else:
-    store = InMemoryStore()
+# Import store from main to use the same instance across all routes
+from app.main import store
 
 
 @prompt_router.get("/health")
