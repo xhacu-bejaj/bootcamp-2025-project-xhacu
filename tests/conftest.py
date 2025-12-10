@@ -1,6 +1,10 @@
 import sys
 import os
 
+# MUST be set before any app imports to avoid MongoDB connection timeout
+os.environ["MONGODB_URI"] = ""
+os.environ["MONGODB_CONNECTION_STRING"] = ""
+
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 import pytest
@@ -14,21 +18,14 @@ def client():
 
 
 @pytest.fixture(scope="session", autouse=True)
-def setup_translate_prompt(client):
-    """Setup a translate prompt once for all tests"""
-    prompt_payload = {
-        "purpose": "translate",
-        "name": "Translator",
-        "template": "Translate this text: {{document_text}}",
-    }
-    response = client.post("/v1/prompts", json=prompt_payload)
-    if response.status_code == 200:
-        # Get the prompt ID from the list endpoint
-        list_response = client.get("/v1/prompts/translate")
-        if list_response.status_code == 200 and list_response.json():
-            prompt_id = list_response.json()[0]["id"]
-            # Activate for user_anon
-            client.post(
-                f"/v1/prompts/{prompt_id}/activate?purpose=translate",
-                headers={"x-user-id": "user_anon"},
-            )
+def setup_translate_prompt():
+    """Create a default translate prompt for tests that need it."""
+    from app.main import store
+    
+    prompt = store.create(
+        purpose="translate",
+        name="Default Translate",
+        template="Translate the following document to English:\n\n{document}"
+    )
+    store.set_active(user_id="user_anon", purpose="translate", prompt_id=prompt.id)
+    yield
