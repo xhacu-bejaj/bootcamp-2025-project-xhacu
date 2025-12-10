@@ -5,6 +5,7 @@ Sets up FastAPI application with:
 - API routers for prompts, predictions, database health, and history
 - Exception handlers and logging
 """
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 import uvicorn
@@ -29,7 +30,18 @@ else:
     else:
         store = InMemoryStore()
 
-app = FastAPI(title="Prompted Doc Processor", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan - startup and shutdown events."""
+    # Startup: store is already initialized above
+    yield
+    # Shutdown: close MongoDB connection if applicable
+    if isinstance(store, MongoDBStore):
+        store.close()
+
+
+app = FastAPI(title="Prompted Doc Processor", version="0.1.0", lifespan=lifespan)
 
 # app.add_exception_handler(HTTPException, http_exception_handler)
 
