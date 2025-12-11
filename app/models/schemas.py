@@ -47,7 +47,7 @@ class PredictResponse(BaseModel):
     latency_ms: int
 
 
-class OpenaiOutputSchema(BaseModel):
+class OutputSchema(BaseModel):
     output_text: str
 
 
