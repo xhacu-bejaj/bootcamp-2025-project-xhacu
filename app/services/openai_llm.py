@@ -5,7 +5,6 @@ from typing import Set
 from fastapi import HTTPException
 from openai import OpenAI
 
-from app.models.domain import Prompt
 from app.services.llm_client import LLMClient
 from app.models.schemas import ModelInfo, OpenaiOutputSchema, PredictResponse
 from app.core.config import settings
@@ -33,9 +32,7 @@ class OpenaiLLM(LLMClient):
         self.client = OpenAI(api_key=OPENAI_API_KEY)
 
     @log_api_call
-    def generate(
-        self, active_prompt: Prompt, document_text: str, **kwargs
-    ) -> PredictResponse | None:
+    def generate(self, prompt: str, **kwargs) -> PredictResponse | None:
         VALID_CONFIG_KEYS: Set[str] = {
             "temperature",
             "max_tokens",
@@ -44,6 +41,14 @@ class OpenaiLLM(LLMClient):
             "presence_penalty",
             "response_format",
         }
+
+        prompt_id = kwargs.pop("prompt_id", None)
+        prompt_version = kwargs.pop("prompt_version", None)
+        document_text = kwargs.pop("document_text", None)
+        if not all([prompt_id, prompt_version, document_text]):
+            raise ValueError(
+                "prompt_id, prompt_version, and document_text must be provided."
+            )
 
         final_temperature: float = kwargs.get("temperature", self.temperature)
 
@@ -54,14 +59,10 @@ class OpenaiLLM(LLMClient):
             "Do not include any other keys, explanations, or text outside the JSON block."
         )
 
-        # Render prompt template with Jinja2
-        rendered_prompt = active_prompt.render({
-            "document_text": document_text,
-            "json_instruction": json_instruction
-        })
+        system_prompt = f"{prompt}\n\n{json_instruction}"
 
         messages = [
-            {"role": "system", "content": rendered_prompt},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": document_text},
         ]
 
@@ -101,8 +102,8 @@ class OpenaiLLM(LLMClient):
         predicted_response = PredictResponse(
             output_text=llm_output.output_text,
             model_info=ModelInfo(model=self.model, temperature=final_temperature),
-            prompt_id=active_prompt.id,
-            prompt_version=active_prompt.version,
+            prompt_id=prompt_id,
+            prompt_version=prompt_version,
             latency_ms=latency_ms,
         )
         return predicted_response
