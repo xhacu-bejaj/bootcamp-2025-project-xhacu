@@ -1,11 +1,9 @@
 from abc import ABC, abstractmethod
 
-from app.models.domain import Prompt
+from app.models.schemas import PredictResponse
 
 
 class LLMClient(ABC):
     @abstractmethod
-    def generate(
-        self, active_prompt: Prompt, document_text, **params
-    ): 
+    def generate(self, prompt: str, **params) -> PredictResponse:
         ...
