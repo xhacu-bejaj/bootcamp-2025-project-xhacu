@@ -41,7 +41,7 @@ class Prompt:
         Returns:
             Rendered template string
         """
-        if self.template is not None:
+        if self.template:
             template = Template(self.template)
             return template.render(parameters)
         return ""
