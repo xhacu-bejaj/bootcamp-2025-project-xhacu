@@ -28,7 +28,7 @@ class ChunkStore:
 
         self._collection = self._client.get_or_create_collection(
             name=settings.CHROMA_COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"}  
+            metadata={"hnsw:space": "cosine"}  # do anns using cosine similarity
         )
 
     @log_api_call
@@ -86,10 +86,10 @@ class ChunkStore:
             ValueError: If n_chunks is invalid
             RuntimeError: If database query fails
         """
-        if n_chunks < 1:
+        if n_chunks < 1: # magic number no good
             raise ValueError("n_chunks must be at least 1")
 
-        if n_chunks > 100:
+        if n_chunks > 100: # magic number no good
             raise ValueError("n_chunks cannot exceed 100")
 
         try:

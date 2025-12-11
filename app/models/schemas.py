@@ -23,6 +23,7 @@ class PromptPatch(BaseModel):
 
 
 class LLMParams(BaseModel):
+    #model: str
     temperature: Optional[float] = None
     model_config = {"extra": "forbid"}
 

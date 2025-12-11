@@ -115,7 +115,7 @@ def retrieve_chunks(text: str, n_chunks: int = 5) -> List[ChunkResponse]:
         if not text or not text.strip():
             raise ValueError("Query text cannot be empty")
 
-        if n_chunks < 1 or n_chunks > 100:
+        if n_chunks < 1 or n_chunks > 100: # magic numbers no good
             raise ValueError("n_chunks must be between 1 and 100")
 
         store = get_chunk_store()
