@@ -40,11 +40,18 @@ def test_openai_llm_generate_success(mock_openai, mock_settings):
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
+    doc = "some doc"
     prompt = Prompt(
         id="p1", purpose="test", name="P", template="Do: {{text}}", version=1
     )
+    rendered_prompt = prompt.render({"text": doc})
 
-    res = llm.generate(prompt, "some doc")
+    res = llm.generate(
+        rendered_prompt,
+        prompt_id=prompt.id,
+        prompt_version=prompt.version,
+        document_text=doc,
+    )
     assert res is not None
     assert res.output_text == "OK from openai"
     assert res.model_info.model == llm.model
@@ -66,11 +73,19 @@ def test_openai_llm_generate_with_temperature_override(mock_openai, mock_setting
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
+    doc = "doc"
     prompt = Prompt(
         id="p2", purpose="creative", name="P2", template="Create: {{text}}", version=1
     )
+    rendered_prompt = prompt.render({"text": doc})
 
-    res = llm.generate(prompt, "doc", temperature=0.9)
+    res = llm.generate(
+        rendered_prompt,
+        prompt_id=prompt.id,
+        prompt_version=prompt.version,
+        document_text=doc,
+        temperature=0.9,
+    )
     assert res is not None
     assert res.model_info.temperature == 0.9
     assert res.output_text == "creative output"
@@ -86,12 +101,19 @@ def test_openai_llm_api_error_raises_http_exception(mock_openai, mock_settings):
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
+    doc = "doc"
     prompt = Prompt(
         id="p3", purpose="test", name="P3", template="Test: {{text}}", version=1
     )
+    rendered_prompt = prompt.render({"text": doc})
 
     with pytest.raises(HTTPException, match="OpenAI API failed"):
-        llm.generate(prompt, "doc")
+        llm.generate(
+            rendered_prompt,
+            prompt_id=prompt.id,
+            prompt_version=prompt.version,
+            document_text=doc,
+        )
 
 
 @patch("app.services.openai_llm.settings")
@@ -107,6 +129,7 @@ def test_openai_llm_system_prompt_composition(mock_openai, mock_settings):
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
+    doc = "doc"
     prompt = Prompt(
         id="p4",
         purpose="compose",
@@ -114,8 +137,14 @@ def test_openai_llm_system_prompt_composition(mock_openai, mock_settings):
         template="Compose: {{x}}",
         version=1,
     )
+    rendered_prompt = prompt.render({"x": doc})
 
-    result = llm.generate(prompt, "doc")
+    result = llm.generate(
+        rendered_prompt,
+        prompt_id=prompt.id,
+        prompt_version=prompt.version,
+        document_text=doc,
+    )
     assert result is not None
 
     call_args = mock_client_instance.chat.completions.create.call_args
@@ -136,11 +165,21 @@ def test_openai_llm_api_params_forwarding(mock_openai, mock_settings):
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
+    doc = "doc"
     prompt = Prompt(
         id="p5", purpose="forward", name="Forward", template="Forward: {{x}}", version=1
     )
+    rendered_prompt = prompt.render({"x": doc})
 
-    llm.generate(prompt, "doc", top_p=0.9, max_tokens=500, frequency_penalty=0.2)
+    llm.generate(
+        rendered_prompt,
+        prompt_id=prompt.id,
+        prompt_version=prompt.version,
+        document_text=doc,
+        top_p=0.9,
+        max_tokens=500,
+        frequency_penalty=0.2,
+    )
 
     call_args = mock_client_instance.chat.completions.create.call_args
     kwargs = call_args.kwargs if hasattr(call_args, "kwargs") else call_args[1]
@@ -162,12 +201,19 @@ def test_openai_llm_handles_null_response(mock_openai, mock_settings):
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
+    doc = "doc"
     prompt = Prompt(
         id="p6", purpose="null", name="Null Test", template="Null: {{x}}", version=1
     )
+    rendered_prompt = prompt.render({"x": doc})
 
     with pytest.raises(ValueError):
-        llm.generate(prompt, "doc")
+        llm.generate(
+            rendered_prompt,
+            prompt_id=prompt.id,
+            prompt_version=prompt.version,
+            document_text=doc,
+        )
 
 
 @patch("app.services.openai_llm.settings")
@@ -183,12 +229,19 @@ def test_openai_llm_invalid_json_response(mock_openai, mock_settings):
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
+    doc = "doc"
     prompt = Prompt(
         id="p7", purpose="invalid", name="Invalid", template="Invalid: {{x}}", version=1
     )
+    rendered_prompt = prompt.render({"x": doc})
 
     with pytest.raises(ValueError):
-        llm.generate(prompt, "doc")
+        llm.generate(
+            rendered_prompt,
+            prompt_id=prompt.id,
+            prompt_version=prompt.version,
+            document_text=doc,
+        )
 
 
 @patch("app.services.openai_llm.settings")
@@ -203,6 +256,7 @@ def test_openai_llm_api_exception_handling(mock_openai, mock_settings):
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
+    doc = "doc"
     prompt = Prompt(
         id="p8",
         purpose="api_error",
@@ -210,9 +264,15 @@ def test_openai_llm_api_exception_handling(mock_openai, mock_settings):
         template="Error: {{x}}",
         version=1,
     )
+    rendered_prompt = prompt.render({"x": doc})
 
     with pytest.raises(HTTPException):
-        llm.generate(prompt, "doc")
+        llm.generate(
+            rendered_prompt,
+            prompt_id=prompt.id,
+            prompt_version=prompt.version,
+            document_text=doc,
+        )
 
 
 @patch("app.services.openai_llm.settings")
@@ -230,11 +290,19 @@ def test_openai_llm_response_format_override(mock_openai, mock_settings):
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
+    doc = "doc"
     prompt = Prompt(
         id="p9", purpose="format", name="Format", template="Format: {{x}}", version=1
     )
+    rendered_prompt = prompt.render({"x": doc})
 
-    result = llm.generate(prompt, "doc", response_format={"type": "json_object"})
+    result = llm.generate(
+        rendered_prompt,
+        prompt_id=prompt.id,
+        prompt_version=prompt.version,
+        document_text=doc,
+        response_format={"type": "json_object"},
+    )
     assert result is not None
 
     call_args = mock_client_instance.chat.completions.create.call_args
