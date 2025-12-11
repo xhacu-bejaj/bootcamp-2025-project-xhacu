@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from openai import OpenAI
 
 from app.services.llm_client import LLMClient
-from app.models.schemas import ModelInfo, OpenaiOutputSchema, PredictResponse
+from app.models.schemas import ModelInfo, OutputSchema, PredictResponse
 from app.core.config import settings
 from app.core.logging import setup_logging, log_api_call
 
@@ -21,11 +21,7 @@ class OpenaiLLM(LLMClient):
 
     @log_api_call
     def __post_init__(self):
-        try:
-            OPENAI_API_KEY = settings.OPENAI_API_KEY
-        except Exception:
-            raise ValueError("OPENAI_API_KEY is not set in the environment")
-
+        OPENAI_API_KEY = settings.OPENAI_API_KEY
         if not OPENAI_API_KEY:
             raise ValueError("OPENAI_API_KEY is missing or empty.")
 
@@ -93,7 +89,7 @@ class OpenaiLLM(LLMClient):
             raise ValueError("OpenAI model returned no content.")
 
         try:
-            llm_output = OpenaiOutputSchema.model_validate_json(json_string)
+            llm_output = OutputSchema.model_validate_json(json_string)
         except Exception as e:
             raise ValueError(
                 f"LLM failed to return valid JSON conforming to PredictResponse schema: {e}. Raw Text: {json_string}"

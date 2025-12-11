@@ -2,7 +2,6 @@ from dataclasses import dataclass
 import time
 from typing import Set
 
-
 from fastapi import HTTPException
 from google import genai
 from google.genai.types import GenerateContentConfig
@@ -18,30 +17,26 @@ setup_logging()
 
 @dataclass
 class GoogleLLM(LLMClient):
-    model: str = "gemini-1.5-flash"
+    model: str = "gemini-2.5-flash"
     temperature: float = 0.5
 
     @log_api_call
     def __post_init__(self):
-        try:
-            GOOGLE_API_KEY = settings.GOOGLE_API_KEY
-        except Exception:
-            raise ValueError("GOOGLE_API_KEY is not set in the environment")
-
+        GOOGLE_API_KEY = settings.GOOGLE_API_KEY
         if not GOOGLE_API_KEY:
             raise ValueError("GOOGLE_API_KEY is missing or empty.")
 
         self.client = genai.Client(api_key=GOOGLE_API_KEY)
         self.config = GenerateContentConfig()
 
-    @log_api_call
+    @log_api_call 
     def generate(self, prompt: str, **kwargs) -> PredictResponse | None:
-        VALID_CONFIG_KEYS: Set[str] = {
+        VALID_CONFIG_KEYS: list[str] = [
             "temperature",
             "max_output_tokens",
             "top_k",
             "top_p",
-        }
+        ]
 
         prompt_id = kwargs.pop("prompt_id", None)
         prompt_version = kwargs.pop("prompt_version", None)
@@ -84,9 +79,7 @@ class GoogleLLM(LLMClient):
             end_time = time.perf_counter()
             latency_ms = int((end_time - start_time) * 1000)
         except Exception as e:
-            raise HTTPException(
-                status_code=400, detail=f"Model failed to generate content: {e}"
-            )
+            raise ValueError(f"Model failed to generate content: {e}")
 
         json_string = response.text
         if json_string is not None:
