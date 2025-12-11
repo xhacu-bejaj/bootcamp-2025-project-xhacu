@@ -7,10 +7,9 @@ from fastapi import HTTPException
 from google import genai
 from google.genai.types import GenerateContentConfig
 
-from app.models.domain import Prompt
 from app.services.llm_client import LLMClient
 from app.core.config import settings
-from app.models.schemas import ModelInfo, PredictResponse
+from app.models.schemas import ModelInfo, OutputSchema, PredictResponse
 from app.core.logging import setup_logging, log_api_call
 
 
@@ -19,7 +18,7 @@ setup_logging()
 
 @dataclass
 class GoogleLLM(LLMClient):
-    model: str = "gemini-2.5-flash"
+    model: str = "gemini-1.5-flash"
     temperature: float = 0.5
 
     @log_api_call
@@ -36,9 +35,7 @@ class GoogleLLM(LLMClient):
         self.config = GenerateContentConfig()
 
     @log_api_call
-    def generate(
-        self, active_prompt: Prompt, document_text: str, **kwargs
-    ) -> PredictResponse | None:
+    def generate(self, prompt: str, **kwargs) -> PredictResponse | None:
         VALID_CONFIG_KEYS: Set[str] = {
             "temperature",
             "max_output_tokens",
@@ -46,12 +43,17 @@ class GoogleLLM(LLMClient):
             "top_p",
         }
 
+        prompt_id = kwargs.pop("prompt_id", None)
+        prompt_version = kwargs.pop("prompt_version", None)
+        if not prompt_id or not prompt_version:
+            raise ValueError("prompt_id and prompt_version must be provided.")
+
         user_temperature_override: float | None = kwargs.get("temperature")
 
         config_params = {
             "temperature": self.temperature,
             "response_mime_type": "application/json",
-            "response_schema": PredictResponse,
+            "response_schema": OutputSchema,
         }
 
         if user_temperature_override is not None:
@@ -74,25 +76,22 @@ class GoogleLLM(LLMClient):
             )
         start_time = time.perf_counter()
         try:
-            # Render prompt template with Jinja2
-            rendered_prompt = active_prompt.render({"document_text": document_text})
-            
             response = self.client.models.generate_content(
-                model=self.model,
-                contents=rendered_prompt,
+                model=f"models/{self.model}",
+                contents=prompt,
                 config=config,
             )
             end_time = time.perf_counter()
             latency_ms = int((end_time - start_time) * 1000)
-        except Exception:
+        except Exception as e:
             raise HTTPException(
-                status_code=400, detail="Model failed to generate content"
+                status_code=400, detail=f"Model failed to generate content: {e}"
             )
 
         json_string = response.text
         if json_string is not None:
             try:
-                llm_output = PredictResponse.model_validate_json(json_string)
+                llm_output = OutputSchema.model_validate_json(json_string)
             except Exception as e:
                 raise ValueError(
                     f"LLM failed to return valid JSON conforming to PredictResponse schema: {e}. Raw Text: {json_string}"
@@ -101,8 +100,8 @@ class GoogleLLM(LLMClient):
         predicted_response = PredictResponse(
             output_text=llm_output.output_text,
             model_info=ModelInfo(model=self.model, temperature=final_temperature),
-            prompt_id=active_prompt.id,
-            prompt_version=active_prompt.version,
+            prompt_id=prompt_id,
+            prompt_version=prompt_version,
             latency_ms=latency_ms,
         )
         return predicted_response
