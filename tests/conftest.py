@@ -25,7 +25,7 @@ def setup_translate_prompt():
     prompt = store.create(
         purpose="translate",
         name="Default Translate",
-        template="Translate the following document to English:\n\n{document}"
+        template="Translate the following document to English:\n\n{{ document_text }}"
     )
     store.set_active(user_id="user_anon", purpose="translate", prompt_id=prompt.id)
     yield
