@@ -27,10 +27,9 @@ class GoogleLLM(LLMClient):
             raise ValueError("GOOGLE_API_KEY is missing or empty.")
 
         self.client = genai.Client(api_key=GOOGLE_API_KEY)
-        self.config = GenerateContentConfig()
 
     @log_api_call 
-    def generate(self, prompt: str, **kwargs) -> PredictResponse | None:
+    def generate(self, prompt: str, **params) -> PredictResponse | None:
         VALID_CONFIG_KEYS: list[str] = [
             "temperature",
             "max_output_tokens",
@@ -38,30 +37,28 @@ class GoogleLLM(LLMClient):
             "top_p",
         ]
 
-        prompt_id = kwargs.pop("prompt_id", None)
-        prompt_version = kwargs.pop("prompt_version", None)
-        if not prompt_id or not prompt_version:
-            raise ValueError("prompt_id and prompt_version must be provided.")
+        prompt_id = params.pop("prompt_id", None)
+        prompt_version = params.pop("prompt_version", None)
+        document_text = params.pop("document_text", None)
+        if not all([prompt_id, prompt_version, document_text]):
+            raise ValueError(
+                "prompt_id, prompt_version, and document_text must be provided."
+            )
 
-        user_temperature_override: float | None = kwargs.get("temperature")
+        final_temperature: float = params.get("temperature", self.temperature)
 
         config_params = {
-            "temperature": self.temperature,
+            "temperature": final_temperature,
             "response_mime_type": "application/json",
             "response_schema": OutputSchema,
         }
 
-        if user_temperature_override is not None:
-            config_params["temperature"] = user_temperature_override
-
-        filtered_kwargs = {
+        filtered_params = {
             k: v
-            for k, v in kwargs.items()
-            if k in VALID_CONFIG_KEYS and k != "temperature"
+            for k, v in params.items()
+            if k in VALID_CONFIG_KEYS and k not in config_params
         }
-        config_params.update(filtered_kwargs)
-
-        final_temperature: float = config_params["temperature"]
+        config_params.update(filtered_params)
 
         try:
             config: GenerateContentConfig = GenerateContentConfig(**config_params)
