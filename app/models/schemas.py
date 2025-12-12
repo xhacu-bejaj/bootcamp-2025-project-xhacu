@@ -21,8 +21,9 @@ class PromptPatch(BaseModel):
     name: Optional[str] = None
     template: Optional[str] = None
 
+# TODO: make all fields optional, decide whether to keep model field
 class LLMParams(BaseModel):
-    model: str
+    model: str 
     temperature: float
     model_config = {"extra": "forbid"}
 
