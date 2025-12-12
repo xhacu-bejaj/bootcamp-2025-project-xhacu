@@ -7,44 +7,69 @@ Sets up FastAPI application with:
 """
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.exceptions import HTTPException
 
 import uvicorn
 
 
 from app.services.prompt_store import FileSnapshotStore, InMemoryStore
 from app.services.mongodb_store import MongoDBStore
-from app.core.errors import generic_exception_handler
+from app.services.chunk_store import ChunkStore
+from app.core.errors import (
+    generic_exception_handler,
+    http_exception_handler,
+    prompt_not_found_handler,
+    llm_generation_handler,
+    database_error_handler,
+    configuration_error_handler,
+)
+from app.core.exceptions import (
+    PromptNotFoundError,
+    LLMGenerationError,
+    DatabaseError,
+    ConfigurationError,
+)
 from app.core.config import settings
 from app.core.logging import setup_logging
-
-
-if settings.FILE_SNAPSHOT:
-    store = FileSnapshotStore()
-else:
-    mongodb_uri = getattr(settings, "MONGODB_URI", None)
-    if mongodb_uri and mongodb_uri.strip():
-        try:
-            store = MongoDBStore(mongodb_uri=mongodb_uri)
-        except Exception:
-            store = InMemoryStore()
-    else:
-        store = InMemoryStore()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan - startup and shutdown events."""
-    # Startup: store is already initialized above
+    # Startup
+    if settings.FILE_SNAPSHOT:
+        prompt_store = FileSnapshotStore()
+    else:
+        mongodb_uri = getattr(settings, "MONGODB_URI", None)
+        if mongodb_uri and mongodb_uri.strip():
+            try:
+                prompt_store = MongoDBStore(mongodb_uri=mongodb_uri)
+                await prompt_store.initialize()
+            except Exception:
+                prompt_store = InMemoryStore()
+        else:
+            prompt_store = InMemoryStore()
+    
+    app.state.prompt_store = prompt_store
+
+    chunk_store = ChunkStore()
+    await chunk_store.initialize()
+    app.state.chunk_store = chunk_store
+    
     yield
+    
     # Shutdown: close MongoDB connection if applicable
-    if isinstance(store, MongoDBStore):
-        store.close()
+    if isinstance(app.state.prompt_store, MongoDBStore):
+        await app.state.prompt_store.close()
 
 
 app = FastAPI(title="Prompted Doc Processor", version="0.1.0", lifespan=lifespan)
 
-# app.add_exception_handler(HTTPException, http_exception_handler)
-
+app.add_exception_handler(HTTPException, http_exception_handler) # type: ignore
+app.add_exception_handler(PromptNotFoundError, prompt_not_found_handler) # type: ignore
+app.add_exception_handler(LLMGenerationError, llm_generation_handler) # type: ignore
+app.add_exception_handler(DatabaseError, database_error_handler) # type: ignore
+app.add_exception_handler(ConfigurationError, configuration_error_handler) # type: ignore
 app.add_exception_handler(Exception, generic_exception_handler)
 setup_logging()
 
