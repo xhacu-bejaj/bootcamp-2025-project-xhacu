@@ -6,11 +6,12 @@ This module provides endpoints for:
 - Retrieving similar chunks based on query text
 """
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
 
 from app.models.schemas import ChunkInsert, ChunkResponse, ChunkMetadata
-from app.services.chunk_store import get_chunk_store
+from app.services.chunk_store import ChunkStore
+from app.api.dependencies import get_chunk_store
 from app.core.logging import log_api_call, API_LOGGER
 
 chunk_router = APIRouter(prefix="/v1/chunks", tags=["chunks"])
@@ -28,7 +29,9 @@ chunk_router = APIRouter(prefix="/v1/chunks", tags=["chunks"])
     }
 )
 @log_api_call
-def insert_chunk(chunk_data: ChunkInsert) -> ChunkResponse:
+async def insert_chunk(
+    chunk_data: ChunkInsert, store: ChunkStore = Depends(get_chunk_store)
+) -> ChunkResponse:
     """
     Insert a text chunk into the vector database.
 
@@ -39,7 +42,6 @@ def insert_chunk(chunk_data: ChunkInsert) -> ChunkResponse:
         ChunkResponse with chunk ID and details
     """
     try:
-        store = get_chunk_store()
         metadata_dict = None
         if chunk_data.metadata:
             metadata_dict = {
@@ -47,7 +49,7 @@ def insert_chunk(chunk_data: ChunkInsert) -> ChunkResponse:
                 "position": chunk_data.metadata.position
             }
         
-        chunk = store.insert_chunk(
+        chunk = await store.insert_chunk(
             text=chunk_data.text,
             metadata=metadata_dict
         )
@@ -96,7 +98,9 @@ def insert_chunk(chunk_data: ChunkInsert) -> ChunkResponse:
     }
 )
 @log_api_call
-def retrieve_chunks(text: str, n_chunks: int = 5) -> List[ChunkResponse]:
+async def retrieve_chunks(
+    text: str, n_chunks: int = 5, store: ChunkStore = Depends(get_chunk_store)
+) -> List[ChunkResponse]:
     """
     Retrieve the most similar chunks to the query text.
 
@@ -118,8 +122,7 @@ def retrieve_chunks(text: str, n_chunks: int = 5) -> List[ChunkResponse]:
         if n_chunks < 1 or n_chunks > 100: # magic numbers no good
             raise ValueError("n_chunks must be between 1 and 100")
 
-        store = get_chunk_store()
-        chunks = store.retrieve_chunks(query_text=text, n_chunks=n_chunks)
+        chunks = await store.retrieve_chunks(query_text=text, n_chunks=n_chunks)
 
         return [
             ChunkResponse(
