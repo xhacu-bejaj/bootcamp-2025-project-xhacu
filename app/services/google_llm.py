@@ -1,14 +1,13 @@
 from dataclasses import dataclass
 import time
-from typing import Set
+from typing import Optional
 
-from fastapi import HTTPException
 from google import genai
 from google.genai.types import GenerateContentConfig
 
 from app.services.llm_client import LLMClient
 from app.core.config import settings
-from app.models.schemas import ModelInfo, OutputSchema, PredictResponse
+from app.models.schemas import LLMParams, LLMOutput, OutputSchema
 from app.core.logging import setup_logging, log_api_call
 
 
@@ -29,36 +28,16 @@ class GoogleLLM(LLMClient):
         self.client = genai.Client(api_key=GOOGLE_API_KEY)
 
     @log_api_call 
-    def generate(self, prompt: str, **params) -> PredictResponse | None:
-        VALID_CONFIG_KEYS: list[str] = [
-            "temperature",
-            "max_output_tokens",
-            "top_k",
-            "top_p",
-        ]
+    def generate(self, prompt: str, params:Optional[LLMParams] = None) -> LLMOutput | None:
 
-        prompt_id = params.pop("prompt_id", None)
-        prompt_version = params.pop("prompt_version", None)
-        document_text = params.pop("document_text", None)
-        if not all([prompt_id, prompt_version, document_text]):
-            raise ValueError(
-                "prompt_id, prompt_version, and document_text must be provided."
-            )
-
-        final_temperature: float = params.get("temperature", self.temperature)
-
+        # Determine the actual temperature to use
+        actual_temperature = params.temperature if params and params.temperature is not None else self.temperature
+        
         config_params = {
-            "temperature": final_temperature,
+            "temperature": actual_temperature,
             "response_mime_type": "application/json",
-            "response_schema": OutputSchema,
+            "response_schema": OutputSchema.model_json_schema(), # Ensures output conforms to OutputSchema
         }
-
-        filtered_params = {
-            k: v
-            for k, v in params.items()
-            if k in VALID_CONFIG_KEYS and k not in config_params
-        }
-        config_params.update(filtered_params)
 
         try:
             config: GenerateContentConfig = GenerateContentConfig(**config_params)
@@ -84,14 +63,12 @@ class GoogleLLM(LLMClient):
                 llm_output = OutputSchema.model_validate_json(json_string)
             except Exception as e:
                 raise ValueError(
-                    f"LLM failed to return valid JSON conforming to PredictResponse schema: {e}. Raw Text: {json_string}"
+                    f"LLM failed to return valid JSON conforming to OutputSchema: {e}. Raw Text: {json_string}"
                 )
 
-        predicted_response = PredictResponse(
+        generated_content = LLMOutput(
             output_text=llm_output.output_text,
-            model_info=ModelInfo(model=self.model, temperature=final_temperature),
-            prompt_id=prompt_id,
-            prompt_version=prompt_version,
+            model_info=LLMParams(model=self.model, temperature=actual_temperature),
             latency_ms=latency_ms,
         )
-        return predicted_response
+        return generated_content

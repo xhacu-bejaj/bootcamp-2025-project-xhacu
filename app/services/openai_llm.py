@@ -1,12 +1,11 @@
 from dataclasses import dataclass
 import time
-from typing import Set
+from typing import Optional
 
-from fastapi import HTTPException
 from openai import OpenAI
 
 from app.services.llm_client import LLMClient
-from app.models.schemas import ModelInfo, OutputSchema, PredictResponse
+from app.models.schemas import LLMParams, OutputSchema, LLMOutput
 from app.core.config import settings
 from app.core.logging import setup_logging, log_api_call
 
@@ -17,7 +16,6 @@ setup_logging()
 class OpenaiLLM(LLMClient):
     model: str = "gpt-4o-mini"
     temperature: float = 0.5
-    provider_name: str = "openai"
 
     @log_api_call
     def __post_init__(self):
@@ -28,30 +26,14 @@ class OpenaiLLM(LLMClient):
         self.client = OpenAI(api_key=OPENAI_API_KEY)
 
     @log_api_call
-    def generate(self, prompt: str, **kwargs) -> PredictResponse | None:
-        VALID_CONFIG_KEYS: Set[str] = {
-            "temperature",
-            "max_tokens",
-            "top_p",
-            "frequency_penalty",
-            "presence_penalty",
-            "response_format",
-        }
-
-        prompt_id = kwargs.pop("prompt_id", None)
-        prompt_version = kwargs.pop("prompt_version", None)
-        document_text = kwargs.pop("document_text", None)
-        if not all([prompt_id, prompt_version, document_text]):
-            raise ValueError(
-                "prompt_id, prompt_version, and document_text must be provided."
-            )
-
-        final_temperature: float = kwargs.get("temperature", self.temperature)
+    def generate(self, prompt: str, params: Optional[LLMParams] = None) -> LLMOutput | None:
+        # Determine actual temperature to use
+        actual_temperature = params.temperature if params and params.temperature is not None else self.temperature
 
         json_instruction = (
             "Your sole output must be a valid JSON object. "
-            "Strictly adhere to the structure of the PredictResponse schema. "
-            "Place the result of the task (the translation) in the **'output_text'** key. "
+            "Strictly adhere to the structure with only an 'output_text' key. "
+            "Place the result of the task in the **'output_text'** key. "
             "Do not include any other keys, explanations, or text outside the JSON block."
         )
 
@@ -59,29 +41,22 @@ class OpenaiLLM(LLMClient):
 
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": document_text},
+            {"role": "user", "content": prompt},
         ]
 
         api_params = {
             "model": self.model,
             "messages": messages,
-            "temperature": final_temperature,
+            "temperature": actual_temperature,
             "response_format": {"type": "json_object"},
         }
-
-        filtered_kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k in VALID_CONFIG_KEYS and k not in api_params
-        }
-        api_params.update(filtered_kwargs)
 
         start_time = time.perf_counter()
         try:
             response = self.client.chat.completions.create(**api_params)
             latency_ms = int((time.perf_counter() - start_time) * 1000)
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"OpenAI API failed: {e}")
+            raise ValueError(f"OpenAI API failed: {e}")
 
         json_string = response.choices[0].message.content
 
@@ -92,14 +67,11 @@ class OpenaiLLM(LLMClient):
             llm_output = OutputSchema.model_validate_json(json_string)
         except Exception as e:
             raise ValueError(
-                f"LLM failed to return valid JSON conforming to PredictResponse schema: {e}. Raw Text: {json_string}"
+                f"LLM failed to return valid JSON conforming to OutputSchema: {e}. Raw Text: {json_string}"
             )
 
-        predicted_response = PredictResponse(
+        return LLMOutput(
             output_text=llm_output.output_text,
-            model_info=ModelInfo(model=self.model, temperature=final_temperature),
-            prompt_id=prompt_id,
-            prompt_version=prompt_version,
+            model_info=LLMParams(model=self.model, temperature=actual_temperature),
             latency_ms=latency_ms,
         )
-        return predicted_response
