@@ -1,17 +1,20 @@
 import pytest
-from unittest.mock import patch, create_autospec
+from unittest.mock import AsyncMock
 from datetime import datetime, timezone
 from app.services.mongodb_store import MongoDBStore
+from app.api.dependencies import get_store
+from app.main import app
 
 
 class TestHistoryAPI:
     """Tests for /v1/history endpoint."""
 
-    def test_get_history_default_params(self, client):
+    @pytest.mark.asyncio
+    async def test_get_history_default_params(self, client):
         """Test GET /v1/history with default parameters."""
-        mock_store = create_autospec(MongoDBStore, instance=True)
-        
-        with patch("app.api.routes_history.store", mock_store):
+        mock_store = AsyncMock(spec=MongoDBStore)
+        app.dependency_overrides[get_store] = lambda: mock_store
+        try:
             
             mock_store.get_history.return_value = [
                 {
@@ -54,11 +57,15 @@ class TestHistoryAPI:
             mock_store.get_history.assert_called_once_with(
                 limit=50, purpose=None, user_id=None
             )
+        finally:
+            app.dependency_overrides.clear()
 
-    def test_get_history_custom_limit(self, client):
+    @pytest.mark.asyncio
+    async def test_get_history_custom_limit(self, client):
         """Test GET /v1/history with custom limit."""
-        mock_store = create_autospec(MongoDBStore, instance=True)
-        with patch("app.api.routes_history.store", mock_store):
+        mock_store = AsyncMock(spec=MongoDBStore)
+        app.dependency_overrides[get_store] = lambda: mock_store
+        try:
             mock_store.get_history.return_value = []
 
             response = client.get("/v1/history?limit=10")
@@ -67,11 +74,15 @@ class TestHistoryAPI:
             mock_store.get_history.assert_called_once_with(
                 limit=10, purpose=None, user_id=None
             )
+        finally:
+            app.dependency_overrides.clear()
 
-    def test_get_history_with_purpose_filter(self, client):
+    @pytest.mark.asyncio
+    async def test_get_history_with_purpose_filter(self, client):
         """Test GET /v1/history with purpose filter."""
-        mock_store = create_autospec(MongoDBStore, instance=True)
-        with patch("app.api.routes_history.store", mock_store):
+        mock_store = AsyncMock(spec=MongoDBStore)
+        app.dependency_overrides[get_store] = lambda: mock_store
+        try:
             mock_store.get_history.return_value = [
                 {
                     "timestamp": datetime(2025, 12, 4, 12, 0, 0, tzinfo=timezone.utc),
@@ -95,11 +106,15 @@ class TestHistoryAPI:
             mock_store.get_history.assert_called_once_with(
                 limit=50, purpose="summarize", user_id=None
             )
+        finally:
+            app.dependency_overrides.clear()
 
-    def test_get_history_with_user_id_filter(self, client):
+    @pytest.mark.asyncio
+    async def test_get_history_with_user_id_filter(self, client):
         """Test GET /v1/history with user_id filter."""
-        mock_store = create_autospec(MongoDBStore, instance=True)
-        with patch("app.api.routes_history.store", mock_store):
+        mock_store = AsyncMock(spec=MongoDBStore)
+        app.dependency_overrides[get_store] = lambda: mock_store
+        try:
             mock_store.get_history.return_value = [
                 {
                     "timestamp": datetime(2025, 12, 4, 12, 0, 0, tzinfo=timezone.utc),
@@ -123,11 +138,15 @@ class TestHistoryAPI:
             mock_store.get_history.assert_called_once_with(
                 limit=50, purpose=None, user_id="test_user"
             )
+        finally:
+            app.dependency_overrides.clear()
 
-    def test_get_history_with_both_filters(self, client):
+    @pytest.mark.asyncio
+    async def test_get_history_with_both_filters(self, client):
         """Test GET /v1/history with both purpose and user_id filters."""
-        mock_store = create_autospec(MongoDBStore, instance=True)
-        with patch("app.api.routes_history.store", mock_store):
+        mock_store = AsyncMock(spec=MongoDBStore)
+        app.dependency_overrides[get_store] = lambda: mock_store
+        try:
             mock_store.get_history.return_value = []
 
             response = client.get(
@@ -141,11 +160,15 @@ class TestHistoryAPI:
             mock_store.get_history.assert_called_once_with(
                 limit=25, purpose="summarize", user_id="test_user"
             )
+        finally:
+            app.dependency_overrides.clear()
 
-    def test_get_history_with_empty_string_filters(self, client):
+    @pytest.mark.asyncio
+    async def test_get_history_with_empty_string_filters(self, client):
         """Test GET /v1/history with empty string filters (converted to None)."""
-        mock_store = create_autospec(MongoDBStore, instance=True)
-        with patch("app.api.routes_history.store", mock_store):
+        mock_store = AsyncMock(spec=MongoDBStore)
+        app.dependency_overrides[get_store] = lambda: mock_store
+        try:
             mock_store.get_history.return_value = []
 
             response = client.get("/v1/history?purpose=&user_id=")
@@ -155,23 +178,29 @@ class TestHistoryAPI:
             mock_store.get_history.assert_called_once_with(
                 limit=50, purpose=None, user_id=None
             )
+        finally:
+            app.dependency_overrides.clear()
 
-    def test_get_history_limit_validation_min(self, client):
+    @pytest.mark.asyncio
+    async def test_get_history_limit_validation_min(self, client):
         """Test GET /v1/history rejects limit < 1."""
         response = client.get("/v1/history?limit=0")
 
         assert response.status_code == 422 
 
-    def test_get_history_limit_validation_max(self, client):
+    @pytest.mark.asyncio
+    async def test_get_history_limit_validation_max(self, client):
         """Test GET /v1/history rejects limit > 1000."""
         response = client.get("/v1/history?limit=1001")
 
         assert response.status_code == 422 
 
-    def test_get_history_limit_boundary_values(self, client):
+    @pytest.mark.asyncio
+    async def test_get_history_limit_boundary_values(self, client):
         """Test GET /v1/history accepts boundary values for limit."""
-        mock_store = create_autospec(MongoDBStore, instance=True)
-        with patch("app.api.routes_history.store", mock_store):
+        mock_store = AsyncMock(spec=MongoDBStore)
+        app.dependency_overrides[get_store] = lambda: mock_store
+        try:
             mock_store.get_history.return_value = []
 
             response = client.get("/v1/history?limit=1")
@@ -185,11 +214,15 @@ class TestHistoryAPI:
             mock_store.get_history.assert_called_with(
                 limit=1000, purpose=None, user_id=None
             )
+        finally:
+            app.dependency_overrides.clear()
 
-    def test_get_history_returns_empty_list_when_no_data(self, client):
+    @pytest.mark.asyncio
+    async def test_get_history_returns_empty_list_when_no_data(self, client):
         """Test GET /v1/history returns empty list when no data exists."""
-        mock_store = create_autospec(MongoDBStore, instance=True)
-        with patch("app.api.routes_history.store", mock_store):
+        mock_store = AsyncMock(spec=MongoDBStore)
+        app.dependency_overrides[get_store] = lambda: mock_store
+        try:
             mock_store.get_history.return_value = []
 
             response = client.get("/v1/history")
@@ -198,11 +231,15 @@ class TestHistoryAPI:
             data = response.json()
             assert data == []
             assert isinstance(data, list)
+        finally:
+            app.dependency_overrides.clear()
 
-    def test_get_history_converts_datetime_to_iso_string(self, client):
+    @pytest.mark.asyncio
+    async def test_get_history_converts_datetime_to_iso_string(self, client):
         """Test that datetime objects are converted to ISO format strings."""
-        mock_store = create_autospec(MongoDBStore, instance=True)
-        with patch("app.api.routes_history.store", mock_store):
+        mock_store = AsyncMock(spec=MongoDBStore)
+        app.dependency_overrides[get_store] = lambda: mock_store
+        try:
 
             mock_store.get_history.return_value = [
                 {
@@ -224,25 +261,34 @@ class TestHistoryAPI:
     
             assert isinstance(data[0]["timestamp"], str)
             assert "2025-12-04T12:30:45" in data[0]["timestamp"]
+        finally:
+            app.dependency_overrides.clear()
 
-    def test_get_history_store_close_called_on_success(self, client):
+    @pytest.mark.asyncio
+    async def test_get_history_store_close_called_on_success(self, client):
         """Test that store connection management (no longer needs close per request)."""
-        mock_store = create_autospec(MongoDBStore, instance=True)
-        with patch("app.api.routes_history.store", mock_store):
+        mock_store = AsyncMock(spec=MongoDBStore)
+        app.dependency_overrides[get_store] = lambda: mock_store
+        try:
             mock_store.get_history.return_value = []
 
             response = client.get("/v1/history")
 
             assert response.status_code == 200
+        finally:
+            app.dependency_overrides.clear()
 
 
-    def test_get_history_store_close_called_on_error(self, client):
+    @pytest.mark.asyncio
+    async def test_get_history_store_close_called_on_error(self, client):
         """Test error handling when get_history raises exception."""
-        mock_store = create_autospec(MongoDBStore, instance=True)
-        with patch("app.api.routes_history.store", mock_store):
+        mock_store = AsyncMock(spec=MongoDBStore)
+        app.dependency_overrides[get_store] = lambda: mock_store
+        try:
             mock_store.get_history.side_effect = Exception("Database error")
 
             with pytest.raises(Exception):
                 client.get("/v1/history")
-
+        finally:
+            app.dependency_overrides.clear()
 

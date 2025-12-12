@@ -1,12 +1,12 @@
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, AsyncMock
 from app.models.domain import Prompt
 from app.models.schemas import LLMParams, LLMOutput
 from app.services.openai_llm import OpenaiLLM
 
 
 @patch("app.services.openai_llm.settings")
-@patch("app.services.openai_llm.OpenAI")
+@patch("app.services.openai_llm.AsyncOpenAI")
 def test_openai_llm_initialization(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "openai-key"
     llm = OpenaiLLM()
@@ -16,16 +16,18 @@ def test_openai_llm_initialization(mock_openai, mock_settings):
 
 
 @patch("app.services.openai_llm.settings")
-@patch("app.services.openai_llm.OpenAI")
+@patch("app.services.openai_llm.AsyncOpenAI")
 def test_openai_llm_missing_api_key(mock_openai, mock_settings):
+    from app.core.exceptions import ConfigurationError
     mock_settings.OPENAI_API_KEY = None
-    with pytest.raises(ValueError, match="OPENAI_API_KEY is missing or empty"):
+    with pytest.raises(ConfigurationError, match="OPENAI_API_KEY is missing or empty"):
         OpenaiLLM()
 
 
 @patch("app.services.openai_llm.settings")
-@patch("app.services.openai_llm.OpenAI")
-def test_openai_llm_generate_success(mock_openai, mock_settings):
+@patch("app.services.openai_llm.AsyncOpenAI")
+@pytest.mark.asyncio
+async def test_openai_llm_generate_success(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "openai-key"
 
     # Build fake response object
@@ -36,7 +38,7 @@ def test_openai_llm_generate_success(mock_openai, mock_settings):
     fake_response.choices = [fake_choice]
 
     mock_client_instance = Mock()
-    mock_client_instance.chat.completions.create.return_value = fake_response
+    mock_client_instance.chat.completions.create = AsyncMock(return_value=fake_response)
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
@@ -46,7 +48,7 @@ def test_openai_llm_generate_success(mock_openai, mock_settings):
     )
     rendered_prompt = prompt.render({"text": doc})
 
-    res = llm.generate(rendered_prompt)
+    res = await llm.generate(rendered_prompt)
     assert res is not None
     assert isinstance(res, LLMOutput)
     assert res.output_text == "OK from openai"
@@ -54,8 +56,9 @@ def test_openai_llm_generate_success(mock_openai, mock_settings):
 
 
 @patch("app.services.openai_llm.settings")
-@patch("app.services.openai_llm.OpenAI")
-def test_openai_llm_generate_with_temperature_override(mock_openai, mock_settings):
+@patch("app.services.openai_llm.AsyncOpenAI")
+@pytest.mark.asyncio
+async def test_openai_llm_generate_with_temperature_override(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "openai-key"
 
     fake_choice = Mock()
@@ -65,7 +68,7 @@ def test_openai_llm_generate_with_temperature_override(mock_openai, mock_setting
     fake_response.choices = [fake_choice]
 
     mock_client_instance = Mock()
-    mock_client_instance.chat.completions.create.return_value = fake_response
+    mock_client_instance.chat.completions.create = AsyncMock(return_value=fake_response)
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
@@ -75,7 +78,7 @@ def test_openai_llm_generate_with_temperature_override(mock_openai, mock_setting
     )
     rendered_prompt = prompt.render({"text": doc})
 
-    res = llm.generate(
+    res = await llm.generate(
         rendered_prompt,
         params=LLMParams(model="gpt-4o-mini", temperature=0.9)
     )
@@ -86,12 +89,14 @@ def test_openai_llm_generate_with_temperature_override(mock_openai, mock_setting
 
 
 @patch("app.services.openai_llm.settings")
-@patch("app.services.openai_llm.OpenAI")
-def test_openai_llm_api_error_raises_http_exception(mock_openai, mock_settings):
+@patch("app.services.openai_llm.AsyncOpenAI")
+@pytest.mark.asyncio
+async def test_openai_llm_api_error_raises_http_exception(mock_openai, mock_settings):
+    from app.core.exceptions import LLMGenerationError
     mock_settings.OPENAI_API_KEY = "openai-key"
 
     mock_client_instance = Mock()
-    mock_client_instance.chat.completions.create.side_effect = Exception("api down")
+    mock_client_instance.chat.completions.create = AsyncMock(side_effect=Exception("api down"))
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
@@ -101,20 +106,21 @@ def test_openai_llm_api_error_raises_http_exception(mock_openai, mock_settings):
     )
     rendered_prompt = prompt.render({"text": doc})
 
-    with pytest.raises(ValueError, match="OpenAI API failed"):
-        llm.generate(rendered_prompt)
+    with pytest.raises(LLMGenerationError, match="OpenAI API failed"):
+        await llm.generate(rendered_prompt)
 
 
 @patch("app.services.openai_llm.settings")
-@patch("app.services.openai_llm.OpenAI")
-def test_openai_llm_system_prompt_composition(mock_openai, mock_settings):
+@patch("app.services.openai_llm.AsyncOpenAI")
+@pytest.mark.asyncio
+async def test_openai_llm_system_prompt_composition(mock_openai, mock_settings):
     mock_settings.OPENAI_API_KEY = "test-api-key"
 
     mock_response = Mock()
     mock_response.choices = [Mock(message=Mock(content='{"output_text": "composed"}'))]
 
     mock_client_instance = Mock()
-    mock_client_instance.chat.completions.create.return_value = mock_response
+    mock_client_instance.chat.completions.create = AsyncMock(return_value=mock_response)
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
@@ -128,7 +134,7 @@ def test_openai_llm_system_prompt_composition(mock_openai, mock_settings):
     )
     rendered_prompt = prompt.render({"x": doc})
 
-    result = llm.generate(rendered_prompt)
+    result = await llm.generate(rendered_prompt)
     assert result is not None
     assert isinstance(result, LLMOutput)
 
@@ -138,15 +144,17 @@ def test_openai_llm_system_prompt_composition(mock_openai, mock_settings):
 
 
 @patch("app.services.openai_llm.settings")
-@patch("app.services.openai_llm.OpenAI")
-def test_openai_llm_handles_null_response(mock_openai, mock_settings):
+@patch("app.services.openai_llm.AsyncOpenAI")
+@pytest.mark.asyncio
+async def test_openai_llm_handles_null_response(mock_openai, mock_settings):
+    from app.core.exceptions import LLMGenerationError
     mock_settings.OPENAI_API_KEY = "test-api-key"
 
     mock_response = Mock()
     mock_response.choices = [Mock(message=Mock(content=None))]
 
     mock_client_instance = Mock()
-    mock_client_instance.chat.completions.create.return_value = mock_response
+    mock_client_instance.chat.completions.create = AsyncMock(return_value=mock_response)
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
@@ -156,20 +164,22 @@ def test_openai_llm_handles_null_response(mock_openai, mock_settings):
     )
     rendered_prompt = prompt.render({"x": doc})
 
-    with pytest.raises(ValueError):
-        llm.generate(rendered_prompt)
+    with pytest.raises(LLMGenerationError):
+        await llm.generate(rendered_prompt)
 
 
 @patch("app.services.openai_llm.settings")
-@patch("app.services.openai_llm.OpenAI")
-def test_openai_llm_invalid_json_response(mock_openai, mock_settings):
+@patch("app.services.openai_llm.AsyncOpenAI")
+@pytest.mark.asyncio
+async def test_openai_llm_invalid_json_response(mock_openai, mock_settings):
+    from app.core.exceptions import LLMGenerationError
     mock_settings.OPENAI_API_KEY = "test-api-key"
 
     mock_response = Mock()
     mock_response.choices = [Mock(message=Mock(content="Not valid JSON"))]
 
     mock_client_instance = Mock()
-    mock_client_instance.chat.completions.create.return_value = mock_response
+    mock_client_instance.chat.completions.create = AsyncMock(return_value=mock_response)
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
@@ -179,19 +189,21 @@ def test_openai_llm_invalid_json_response(mock_openai, mock_settings):
     )
     rendered_prompt = prompt.render({"x": doc})
 
-    with pytest.raises(ValueError):
-        llm.generate(rendered_prompt)
+    with pytest.raises(LLMGenerationError):
+        await llm.generate(rendered_prompt)
 
 
 @patch("app.services.openai_llm.settings")
-@patch("app.services.openai_llm.OpenAI")
-def test_openai_llm_api_exception_handling(mock_openai, mock_settings):
+@patch("app.services.openai_llm.AsyncOpenAI")
+@pytest.mark.asyncio
+async def test_openai_llm_api_exception_handling(mock_openai, mock_settings):
+    from app.core.exceptions import LLMGenerationError
     mock_settings.OPENAI_API_KEY = "test-api-key"
 
     mock_client_instance = Mock()
-    mock_client_instance.chat.completions.create.side_effect = Exception(
+    mock_client_instance.chat.completions.create = AsyncMock(side_effect=Exception(
         "API connection failed"
-    )
+    ))
     mock_openai.return_value = mock_client_instance
 
     llm = OpenaiLLM()
@@ -205,7 +217,7 @@ def test_openai_llm_api_exception_handling(mock_openai, mock_settings):
     )
     rendered_prompt = prompt.render({"x": doc})
 
-    with pytest.raises(ValueError):
-        llm.generate(rendered_prompt)
+    with pytest.raises(LLMGenerationError):
+        await llm.generate(rendered_prompt)
 
 

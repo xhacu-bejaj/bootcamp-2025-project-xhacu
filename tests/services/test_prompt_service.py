@@ -134,9 +134,10 @@ def test_prompt_render_dictionary_variable():
     assert rendered == "User: Eve, Age: 30"
 
 
-def test_store_create_prompt():
+@pytest.mark.asyncio
+async def test_store_create_prompt():
     store = InMemoryStore()
-    prompt = store.create(
+    prompt = await store.create(
         purpose="summarization", name="Summarizer", template="Summarize: {{text}}"
     )
 
@@ -148,58 +149,62 @@ def test_store_create_prompt():
     assert prompt.active is False
 
 
-def test_store_list_prompts_by_purpose():
+@pytest.mark.asyncio
+async def test_store_list_prompts_by_purpose():
     store = InMemoryStore()
 
-    store.create("summarization", "Summarizer 1", "Summarize: {{text}}")
-    store.create("summarization", "Summarizer 2", "Quick summary: {{text}}")
-    store.create("translation", "Translator", "Translate to English: {{text}}")
+    await store.create("summarization", "Summarizer 1", "Summarize: {{text}}")
+    await store.create("summarization", "Summarizer 2", "Quick summary: {{text}}")
+    await store.create("translation", "Translator", "Translate to English: {{text}}")
 
     # List by purpose
-    summary_prompts = store.list("summarization")
+    summary_prompts = await store.list("summarization")
     assert len(summary_prompts) == 2
     assert all(p.purpose == "summarization" for p in summary_prompts)
 
-    trans_prompts = store.list("translation")
+    trans_prompts = await store.list("translation")
     assert len(trans_prompts) == 1
     assert trans_prompts[0].purpose == "translation"
 
 
-def test_store_get_prompt_by_id():
+@pytest.mark.asyncio
+async def test_store_get_prompt_by_id():
     store = InMemoryStore()
 
-    created = store.create("translation", "Translator", "Translate: {{data}}")
-    retrieved = store.get(created.id)
+    created = await store.create("translation", "Translator", "Translate: {{data}}")
+    retrieved = await store.get(created.id)
 
     assert retrieved is not None
     assert retrieved.id == created.id
     assert retrieved.name == "Translator"
 
-    assert store.get("non-existent-id") is None
+    assert await store.get("non-existent-id") is None
 
 
-def test_store_patch_prompt():
+@pytest.mark.asyncio
+async def test_store_patch_prompt():
     store = InMemoryStore()
 
-    prompt = store.create("qa", "QA Bot", "Question: {{q}}")
+    prompt = await store.create("qa", "QA Bot", "Question: {{q}}")
     assert prompt.version == 1
 
-    updated = store.patch(prompt.id, name="QA Assistant", template="Q: {{q}}, A: {{a}}")
+    updated = await store.patch(prompt.id, name="QA Assistant", template="Q: {{q}}, A: {{a}}")
     assert updated is not None
     assert updated.name == "QA Assistant"
     assert updated.template == "Q: {{q}}, A: {{a}}"
     assert updated.version == 2
 
-    retrieved = store.get(prompt.id)
+    retrieved = await store.get(prompt.id)
     assert retrieved.template == "Q: {{q}}, A: {{a}}"
     assert retrieved.version == 2
 
 
-def test_store_patch_only_name():
+@pytest.mark.asyncio
+async def test_store_patch_only_name():
     store = InMemoryStore()
 
-    prompt = store.create("tagging", "Tagger v1", "Tag: {{text}}")
-    updated = store.patch(prompt.id, name="Tagger v2")
+    prompt = await store.create("tagging", "Tagger v1", "Tag: {{text}}")
+    updated = await store.patch(prompt.id, name="Tagger v2")
 
     assert updated is not None
     assert updated.name == "Tagger v2"
@@ -207,11 +212,12 @@ def test_store_patch_only_name():
     assert updated.version == 2
 
 
-def test_store_patch_only_template():
+@pytest.mark.asyncio
+async def test_store_patch_only_template():
     store = InMemoryStore()
 
-    prompt = store.create("classification", "Classifier", "Classify: {{text}}")
-    updated = store.patch(prompt.id, template="New classification: {{text}}")
+    prompt = await store.create("classification", "Classifier", "Classify: {{text}}")
+    updated = await store.patch(prompt.id, template="New classification: {{text}}")
 
     assert updated is not None
     assert updated.name == "Classifier"
@@ -219,93 +225,100 @@ def test_store_patch_only_template():
     assert updated.version == 2
 
 
-def test_store_set_and_get_active_prompt():
+@pytest.mark.asyncio
+async def test_store_set_and_get_active_prompt():
     store = InMemoryStore()
 
-    p1 = store.create("summarization", "Summary v1", "Summarize v1: {{text}}")
-    p2 = store.create("summarization", "Summary v2", "Summarize v2: {{text}}")
+    p1 = await store.create("summarization", "Summary v1", "Summarize v1: {{text}}")
+    p2 = await store.create("summarization", "Summary v2", "Summarize v2: {{text}}")
 
     user_id = "user123"
     purpose = "summarization"
 
-    active = store.set_active(user_id, purpose, p1.id)
+    active = await store.set_active(user_id, purpose, p1.id)
     assert active is not None
     assert active.id == p1.id
     assert active.active is True
 
-    retrieved_active = store.get_active(user_id, purpose)
+    retrieved_active = await store.get_active(user_id, purpose)
     assert retrieved_active is not None
     assert retrieved_active.id == p1.id
 
-    new_active = store.set_active(user_id, purpose, p2.id)
+    new_active = await store.set_active(user_id, purpose, p2.id)
     assert new_active.id == p2.id
     assert new_active.active is True
 
-    p1_check = store.get(p1.id)
+    p1_check = await store.get(p1.id)
     assert p1_check.active is False
 
-    final_active = store.get_active(user_id, purpose)
+    final_active = await store.get_active(user_id, purpose)
     assert final_active.id == p2.id
 
-    other_active = store.get_active("other_user", purpose)
+    other_active = await store.get_active("other_user", purpose)
     assert other_active is None
 
 
-def test_store_set_active_nonexistent_prompt():
+@pytest.mark.asyncio
+async def test_store_set_active_nonexistent_prompt():
     store = InMemoryStore()
 
-    result = store.set_active("user1", "purpose1", "fake-id-123")
+    result = await store.set_active("user1", "purpose1", "fake-id-123")
     assert result is None
 
 
-def test_store_multiple_users_multiple_purposes():
+@pytest.mark.asyncio
+async def test_store_multiple_users_multiple_purposes():
     store = InMemoryStore()
 
-    p1 = store.create("summarization", "Summary", "Summarize: {{text}}")
-    p2 = store.create("translation", "Translator", "Translate: {{text}}")
+    p1 = await store.create("summarization", "Summary", "Summarize: {{text}}")
+    p2 = await store.create("translation", "Translator", "Translate: {{text}}")
 
-    store.set_active("user1", "summarization", p1.id)
-    store.set_active("user2", "translation", p2.id)
-    store.set_active("user1", "translation", p2.id)
+    await store.set_active("user1", "summarization", p1.id)
+    await store.set_active("user2", "translation", p2.id)
+    await store.set_active("user1", "translation", p2.id)
 
-    assert store.get_active("user1", "summarization").id == p1.id
-    assert store.get_active("user2", "translation").id == p2.id
-    assert store.get_active("user1", "translation").id == p2.id
-    assert store.get_active("user2", "summarization") is None
+    assert (await store.get_active("user1", "summarization")).id == p1.id
+    assert (await store.get_active("user2", "translation")).id == p2.id
+    assert (await store.get_active("user1", "translation")).id == p2.id
+    assert await store.get_active("user2", "summarization") is None
 
 
-def test_store_list_empty():
+@pytest.mark.asyncio
+async def test_store_list_empty():
     store = InMemoryStore()
 
-    result = store.list("nonexistent_purpose")
+    result = await store.list("nonexistent_purpose")
     assert result == []
 
 
-def test_store_list_all_prompts():
+@pytest.mark.asyncio
+async def test_store_list_all_prompts():
     store = InMemoryStore()
 
-    store.create("analysis", "Analyzer", "Analyze: {{data}}")
-    store.create("analysis", "Analyzer v2", "Analyze v2: {{data}}")
-    store.create("extraction", "Extractor", "Extract: {{text}}")
+    await store.create("analysis", "Analyzer", "Analyze: {{data}}")
+    await store.create("analysis", "Analyzer v2", "Analyze v2: {{data}}")
+    await store.create("extraction", "Extractor", "Extract: {{text}}")
 
-    all_analysis = store.list("analysis")
+    all_analysis = await store.list("analysis")
     assert len(all_analysis) == 2
     assert all(p.purpose == "analysis" for p in all_analysis)
 
 
-def test_store_patch_nonexistent_prompt():
+@pytest.mark.asyncio
+async def test_store_patch_nonexistent_prompt():
     store = InMemoryStore()
 
-    result = store.patch("fake-id", name="New Name", template="New Template")
+    result = await store.patch("fake-id", name="New Name", template="New Template")
     assert result is None
 
 
-def test_store_get_active_no_active_set():
+@pytest.mark.asyncio
+async def test_store_get_active_no_active_set():
     store = InMemoryStore()
 
-    store.create("testing", "Tester", "Test: {{data}}")
+    await store.create("testing", "Tester", "Test: {{data}}")
 
-    active = store.get_active("user_x", "testing")
+    active = await store.get_active("user_x", "testing")
     assert active is None
 
 
@@ -336,18 +349,20 @@ def temp_json_file():
         os.remove(path)
 
 
-def test_file_snapshot_store_initialization_creates_empty_file(temp_json_file):
+@pytest.mark.asyncio
+async def test_file_snapshot_store_initialization_creates_empty_file(temp_json_file):
     """Test that FileSnapshotStore initializes with an empty state."""
     store = FileSnapshotStore(temp_json_file)
 
     assert os.path.exists(temp_json_file)
-    assert len(store.list("any_purpose")) == 0
+    assert len(await store.list("any_purpose")) == 0
 
 
-def test_file_snapshot_store_persists_created_prompt(temp_json_file):
+@pytest.mark.asyncio
+async def test_file_snapshot_store_persists_created_prompt(temp_json_file):
     """Test that created prompts are saved to JSON file."""
     store = FileSnapshotStore(temp_json_file)
-    prompt = store.create("summarize", "Summarizer", "Summarize: {{text}}")
+    prompt = await store.create("summarize", "Summarizer", "Summarize: {{text}}")
 
     # Verify file was written
     assert os.path.exists(temp_json_file)
@@ -362,39 +377,41 @@ def test_file_snapshot_store_persists_created_prompt(temp_json_file):
     assert data["prompts"][0]["template"] == "Summarize: {{text}}"
 
 
-def test_file_snapshot_store_loads_existing_data(temp_json_file):
+@pytest.mark.asyncio
+async def test_file_snapshot_store_loads_existing_data(temp_json_file):
     """Test that FileSnapshotStore loads existing prompts from file."""
     # Create and save data
     store1 = FileSnapshotStore(temp_json_file)
-    p1 = store1.create("translate", "Translator", "Translate: {{text}}")
-    p2 = store1.create("summarize", "Summarizer", "Summarize: {{text}}")
+    p1 = await store1.create("translate", "Translator", "Translate: {{text}}")
+    p2 = await store1.create("summarize", "Summarizer", "Summarize: {{text}}")
 
     # Create new instance and verify it loads the data
     store2 = FileSnapshotStore(temp_json_file)
-    prompts = store2.list("translate")
+    prompts = await store2.list("translate")
 
     assert len(prompts) == 1
     assert prompts[0].id == p1.id
     assert prompts[0].name == "Translator"
 
-    all_summary = store2.list("summarize")
+    all_summary = await store2.list("summarize")
     assert len(all_summary) == 1
     assert all_summary[0].id == p2.id
 
 
-def test_file_snapshot_store_persists_patch(temp_json_file):
+@pytest.mark.asyncio
+async def test_file_snapshot_store_persists_patch(temp_json_file):
     """Test that patched prompts are saved to file."""
     store1 = FileSnapshotStore(temp_json_file)
-    prompt = store1.create("qa", "QA Bot", "Question: {{q}}")
+    prompt = await store1.create("qa", "QA Bot", "Question: {{q}}")
 
     # Patch the prompt
-    updated = store1.patch(prompt.id, name="QA Assistant", template="Q: {{q}}, A: {{a}}")
+    updated = await store1.patch(prompt.id, name="QA Assistant", template="Q: {{q}}, A: {{a}}")
     assert updated is not None
     assert updated.version == 2
 
     # Load in new instance
     store2 = FileSnapshotStore(temp_json_file)
-    retrieved = store2.get(prompt.id)
+    retrieved = await store2.get(prompt.id)
 
     assert retrieved is not None
     assert retrieved.name == "QA Assistant"
@@ -402,72 +419,76 @@ def test_file_snapshot_store_persists_patch(temp_json_file):
     assert retrieved.version == 2
 
 
-def test_file_snapshot_store_persists_active_prompts(temp_json_file):
+@pytest.mark.asyncio
+async def test_file_snapshot_store_persists_active_prompts(temp_json_file):
     """Test that active prompts are saved and loaded correctly."""
     store1 = FileSnapshotStore(temp_json_file)
-    p1 = store1.create("summarize", "Summary v1", "Summarize: {{text}}")
-    p2 = store1.create("summarize", "Summary v2", "Summarize v2: {{text}}")
+    p1 = await store1.create("summarize", "Summary v1", "Summarize: {{text}}")
+    p2 = await store1.create("summarize", "Summary v2", "Summarize v2: {{text}}")
 
     # Set active
-    store1.set_active("user1", "summarize", p1.id)
+    await store1.set_active("user1", "summarize", p1.id)
 
     # Load in new instance
     store2 = FileSnapshotStore(temp_json_file)
-    active = store2.get_active("user1", "summarize")
+    active = await store2.get_active("user1", "summarize")
 
     assert active is not None
     assert active.id == p1.id
     assert active.active is True
 
     # Verify old prompt is marked inactive
-    p2_retrieved = store2.get(p2.id)
+    p2_retrieved = await store2.get(p2.id)
     assert p2_retrieved.active is False
 
 
-def test_file_snapshot_store_updates_active_correctly(temp_json_file):
+@pytest.mark.asyncio
+async def test_file_snapshot_store_updates_active_correctly(temp_json_file):
     """Test that changing active prompt updates file correctly."""
     store1 = FileSnapshotStore(temp_json_file)
-    p1 = store1.create("translate", "Trans v1", "Translate v1: {{text}}")
-    p2 = store1.create("translate", "Trans v2", "Translate v2: {{text}}")
+    p1 = await store1.create("translate", "Trans v1", "Translate v1: {{text}}")
+    p2 = await store1.create("translate", "Trans v2", "Translate v2: {{text}}")
 
     # Set p1 as active
-    store1.set_active("user1", "translate", p1.id)
+    await store1.set_active("user1", "translate", p1.id)
 
     # Change to p2
-    store1.set_active("user1", "translate", p2.id)
+    await store1.set_active("user1", "translate", p2.id)
 
     # Load in new instance
     store2 = FileSnapshotStore(temp_json_file)
 
     # p2 should be active
-    active = store2.get_active("user1", "translate")
+    active = await store2.get_active("user1", "translate")
     assert active.id == p2.id
 
     # p1 should not be active
-    p1_retrieved = store2.get(p1.id)
+    p1_retrieved = await store2.get(p1.id)
     assert p1_retrieved.active is False
 
 
-def test_file_snapshot_store_multiple_users_and_purposes(temp_json_file):
+@pytest.mark.asyncio
+async def test_file_snapshot_store_multiple_users_and_purposes(temp_json_file):
     """Test multiple users with different purposes persist correctly."""
     store1 = FileSnapshotStore(temp_json_file)
-    p1 = store1.create("summarize", "Summarizer", "Summarize: {{text}}")
-    p2 = store1.create("translate", "Translator", "Translate: {{text}}")
+    p1 = await store1.create("summarize", "Summarizer", "Summarize: {{text}}")
+    p2 = await store1.create("translate", "Translator", "Translate: {{text}}")
 
-    store1.set_active("user1", "summarize", p1.id)
-    store1.set_active("user2", "translate", p2.id)
-    store1.set_active("user1", "translate", p2.id)
+    await store1.set_active("user1", "summarize", p1.id)
+    await store1.set_active("user2", "translate", p2.id)
+    await store1.set_active("user1", "translate", p2.id)
 
     # Load in new instance
     store2 = FileSnapshotStore(temp_json_file)
 
-    assert store2.get_active("user1", "summarize").id == p1.id
-    assert store2.get_active("user2", "translate").id == p2.id
-    assert store2.get_active("user1", "translate").id == p2.id
-    assert store2.get_active("user2", "summarize") is None
+    assert (await store2.get_active("user1", "summarize")).id == p1.id
+    assert (await store2.get_active("user2", "translate")).id == p2.id
+    assert (await store2.get_active("user1", "translate")).id == p2.id
+    assert await store2.get_active("user2", "summarize") is None
 
 
-def test_file_snapshot_store_handles_corrupted_json(temp_json_file):
+@pytest.mark.asyncio
+async def test_file_snapshot_store_handles_corrupted_json(temp_json_file):
     """Test that corrupted JSON files don't crash initialization."""
     # Write corrupted JSON
     with open(temp_json_file, "w") as f:
@@ -475,27 +496,29 @@ def test_file_snapshot_store_handles_corrupted_json(temp_json_file):
 
     # Should not crash, should start fresh
     store = FileSnapshotStore(temp_json_file)
-    assert len(store.list("any_purpose")) == 0
+    assert len(await store.list("any_purpose")) == 0
 
 
-def test_file_snapshot_store_creates_directory_if_missing():
+@pytest.mark.asyncio
+async def test_file_snapshot_store_creates_directory_if_missing():
     """Test that FileSnapshotStore creates parent directories if needed."""
     with tempfile.TemporaryDirectory() as tmpdir:
         nested_path = os.path.join(tmpdir, "nested", "dir", "data.json")
 
         store = FileSnapshotStore(nested_path)
-        store.create("test", "Test", "Test: {{x}}")
+        await store.create("test", "Test", "Test: {{x}}")
 
         # Verify directory and file were created
         assert os.path.exists(nested_path)
         assert os.path.isdir(os.path.dirname(nested_path))
 
 
-def test_file_snapshot_store_json_structure(temp_json_file):
+@pytest.mark.asyncio
+async def test_file_snapshot_store_json_structure(temp_json_file):
     """Test that JSON file has correct structure."""
     store = FileSnapshotStore(temp_json_file)
-    p1 = store.create("summarize", "Summarizer", "Summarize: {{text}}")
-    store.set_active("user1", "summarize", p1.id)
+    p1 = await store.create("summarize", "Summarizer", "Summarize: {{text}}")
+    await store.set_active("user1", "summarize", p1.id)
 
     with open(temp_json_file, "r") as f:
         data = json.load(f)
@@ -524,14 +547,15 @@ def test_file_snapshot_store_json_structure(temp_json_file):
     assert "prompt_id" in active_data
 
 
-def test_file_snapshot_store_get_by_id(temp_json_file):
+@pytest.mark.asyncio
+async def test_file_snapshot_store_get_by_id(temp_json_file):
     """Test that get() method works correctly after reload."""
     store1 = FileSnapshotStore(temp_json_file)
-    created = store1.create("test", "Test Prompt", "Test: {{data}}")
+    created = await store1.create("test", "Test Prompt", "Test: {{data}}")
 
     # Load in new instance and retrieve by ID
     store2 = FileSnapshotStore(temp_json_file)
-    retrieved = store2.get(created.id)
+    retrieved = await store2.get(created.id)
 
     assert retrieved is not None
     assert retrieved.id == created.id
@@ -539,53 +563,56 @@ def test_file_snapshot_store_get_by_id(temp_json_file):
     assert retrieved.template == "Test: {{data}}"
 
 
-def test_file_snapshot_store_list_by_purpose(temp_json_file):
+@pytest.mark.asyncio
+async def test_file_snapshot_store_list_by_purpose(temp_json_file):
     """Test that list() method filters correctly after reload."""
     store1 = FileSnapshotStore(temp_json_file)
-    store1.create("summarize", "S1", "Summarize 1: {{text}}")
-    store1.create("summarize", "S2", "Summarize 2: {{text}}")
-    store1.create("translate", "T1", "Translate: {{text}}")
+    await store1.create("summarize", "S1", "Summarize 1: {{text}}")
+    await store1.create("summarize", "S2", "Summarize 2: {{text}}")
+    await store1.create("translate", "T1", "Translate: {{text}}")
 
     # Load in new instance
     store2 = FileSnapshotStore(temp_json_file)
 
-    summary_prompts = store2.list("summarize")
+    summary_prompts = await store2.list("summarize")
     assert len(summary_prompts) == 2
     assert all(p.purpose == "summarize" for p in summary_prompts)
 
-    translate_prompts = store2.list("translate")
+    translate_prompts = await store2.list("translate")
     assert len(translate_prompts) == 1
     assert translate_prompts[0].purpose == "translate"
 
 
-def test_file_snapshot_store_patch_only_name(temp_json_file):
+@pytest.mark.asyncio
+async def test_file_snapshot_store_patch_only_name(temp_json_file):
     """Test patching only name persists correctly."""
     store1 = FileSnapshotStore(temp_json_file)
-    prompt = store1.create("test", "Original", "Template: {{x}}")
+    prompt = await store1.create("test", "Original", "Template: {{x}}")
 
-    updated = store1.patch(prompt.id, name="Updated Name")
+    updated = await store1.patch(prompt.id, name="Updated Name")
     assert updated is not None
 
     # Load in new instance
     store2 = FileSnapshotStore(temp_json_file)
-    retrieved = store2.get(prompt.id)
+    retrieved = await store2.get(prompt.id)
 
     assert retrieved.name == "Updated Name"
     assert retrieved.template == "Template: {{x}}"
     assert retrieved.version == 2
 
 
-def test_file_snapshot_store_patch_only_template(temp_json_file):
+@pytest.mark.asyncio
+async def test_file_snapshot_store_patch_only_template(temp_json_file):
     """Test patching only template persists correctly."""
     store1 = FileSnapshotStore(temp_json_file)
-    prompt = store1.create("test", "Name", "Old: {{x}}")
+    prompt = await store1.create("test", "Name", "Old: {{x}}")
 
-    updated = store1.patch(prompt.id, template="New: {{y}}")
+    updated = await store1.patch(prompt.id, template="New: {{y}}")
     assert updated is not None
 
     # Load in new instance
     store2 = FileSnapshotStore(temp_json_file)
-    retrieved = store2.get(prompt.id)
+    retrieved = await store2.get(prompt.id)
 
     assert retrieved.name == "Name"
     assert retrieved.template == "New: {{y}}"

@@ -4,16 +4,17 @@ from app.services.prompt_store import InMemoryStore
 from app.models.schemas import PredictResponse, LLMParams
 
 
-def test_process_document_returns_predict_response():
+@pytest.mark.asyncio
+async def test_process_document_returns_predict_response():
     """Test that process_document returns PredictResponse"""
     store = InMemoryStore()
     user_id = "user1"
     purpose = "summarization"
 
-    prompt = store.create(purpose, "Summarizer", "Summarize the following: {{text}}")
-    store.set_active(user_id, purpose, prompt.id)
+    prompt = await store.create(purpose, "Summarizer", "Summarize the following: {{text}}")
+    await store.set_active(user_id, purpose, prompt.id)
 
-    result = process_document(
+    result = await process_document(
         store=store,
         user_id=user_id,
         purpose=purpose,
@@ -26,14 +27,17 @@ def test_process_document_returns_predict_response():
     assert result.model_info.model == "mock"
 
 
-def test_process_document_no_active_prompt():
+@pytest.mark.asyncio
+async def test_process_document_no_active_prompt():
     """Test that process_document raises error when no active prompt"""
+    from app.core.exceptions import PromptNotFoundError
+    
     store = InMemoryStore()
     user_id = "user2"
     purpose = "translation"
 
-    with pytest.raises(ValueError, match="No active prompt found"):
-        process_document(
+    with pytest.raises(PromptNotFoundError, match="No active prompt found"):
+        await process_document(
             store=store,
             user_id=user_id,
             purpose=purpose,
@@ -42,18 +46,19 @@ def test_process_document_no_active_prompt():
         )
 
 
-def test_process_document_with_custom_parameters():
+@pytest.mark.asyncio
+async def test_process_document_with_custom_parameters():
     """Test process_document with custom LLM parameters"""
     store = InMemoryStore()
     user_id = "user4"
     purpose = "extraction"
 
-    prompt = store.create(purpose, "Extractor", "Extract: {{text}}")
-    store.set_active(user_id, purpose, prompt.id)
+    prompt = await store.create(purpose, "Extractor", "Extract: {{text}}")
+    await store.set_active(user_id, purpose, prompt.id)
 
     params = LLMParams(model="mock", temperature=0.5)
     
-    result = process_document(
+    result = await process_document(
         store=store,
         user_id=user_id,
         purpose=purpose,
@@ -67,16 +72,17 @@ def test_process_document_with_custom_parameters():
     assert result.prompt_id == prompt.id
 
 
-def test_process_document_with_mock_provider():
+@pytest.mark.asyncio
+async def test_process_document_with_mock_provider():
     """Test process_document with mock provider"""
     store = InMemoryStore()
     user_id = "user5"
     purpose = "classification"
 
-    prompt = store.create(purpose, "Classifier", "Classify: {{text}}")
-    store.set_active(user_id, purpose, prompt.id)
+    prompt = await store.create(purpose, "Classifier", "Classify: {{text}}")
+    await store.set_active(user_id, purpose, prompt.id)
 
-    result = process_document(
+    result = await process_document(
         store=store,
         user_id=user_id,
         purpose=purpose,
@@ -89,18 +95,19 @@ def test_process_document_with_mock_provider():
     assert result.latency_ms >= 0
 
 
-def test_process_document_multiple_purposes():
+@pytest.mark.asyncio
+async def test_process_document_multiple_purposes():
     """Test process_document with multiple purposes for same user"""
     store = InMemoryStore()
     user_id = "user6"
 
-    p1 = store.create("summarization", "Summarizer", "Summarize: {{text}}")
-    p2 = store.create("translation", "Translator", "Translate: {{text}}")
+    p1 = await store.create("summarization", "Summarizer", "Summarize: {{text}}")
+    p2 = await store.create("translation", "Translator", "Translate: {{text}}")
 
-    store.set_active(user_id, "summarization", p1.id)
-    store.set_active(user_id, "translation", p2.id)
+    await store.set_active(user_id, "summarization", p1.id)
+    await store.set_active(user_id, "translation", p2.id)
 
-    result1 = process_document(
+    result1 = await process_document(
         store=store,
         user_id=user_id,
         purpose="summarization",
@@ -108,7 +115,7 @@ def test_process_document_multiple_purposes():
         provider="mock",
     )
 
-    result2 = process_document(
+    result2 = await process_document(
         store=store,
         user_id=user_id,
         purpose="translation",
@@ -122,16 +129,17 @@ def test_process_document_multiple_purposes():
     assert result2.model_info.model == "mock"
 
 
-def test_process_document_response_has_all_fields():
+@pytest.mark.asyncio
+async def test_process_document_response_has_all_fields():
     """Test that process_document response has all required fields"""
     store = InMemoryStore()
     user_id = "user7"
     purpose = "summarization"
 
-    prompt = store.create(purpose, "Summarizer", "Summarize: {{text}}")
-    store.set_active(user_id, purpose, prompt.id)
+    prompt = await store.create(purpose, "Summarizer", "Summarize: {{text}}")
+    await store.set_active(user_id, purpose, prompt.id)
 
-    result = process_document(
+    result = await process_document(
         store=store,
         user_id=user_id,
         purpose=purpose,
@@ -148,16 +156,17 @@ def test_process_document_response_has_all_fields():
     assert result.prompt_id == prompt.id
 
 
-def test_process_document_preserves_prompt_metadata():
+@pytest.mark.asyncio
+async def test_process_document_preserves_prompt_metadata():
     """Test that process_document preserves prompt metadata"""
     store = InMemoryStore()
     user_id = "user8"
     purpose = "analysis"
 
-    prompt = store.create(purpose, "Analyzer", "Analyze: {{text}}")
-    store.set_active(user_id, purpose, prompt.id)
+    prompt = await store.create(purpose, "Analyzer", "Analyze: {{text}}")
+    await store.set_active(user_id, purpose, prompt.id)
 
-    result = process_document(
+    result = await process_document(
         store=store,
         user_id=user_id,
         purpose=purpose,

@@ -1,9 +1,11 @@
+import pytest
 from app.models.domain import Prompt
 from app.models.schemas import LLMOutput
 from app.services.mock_llm import MockLLM
 
 
-def test_mock_llm_generate_returns_predict_response():
+@pytest.mark.asyncio
+async def test_mock_llm_generate_returns_predict_response():
     """Test that MockLLM.generate returns LLMOutput object"""
     llm = MockLLM()
     doc = "Test document"
@@ -12,7 +14,7 @@ def test_mock_llm_generate_returns_predict_response():
     )
     rendered_prompt = prompt.render({"text": doc})
 
-    result = llm.generate(rendered_prompt)
+    result = await llm.generate(rendered_prompt)
 
     assert isinstance(result, LLMOutput)
     assert result.output_text is not None
@@ -21,7 +23,8 @@ def test_mock_llm_generate_returns_predict_response():
     assert result.model_info.model == "mock"
 
 
-def test_mock_llm_includes_document():
+@pytest.mark.asyncio
+async def test_mock_llm_includes_document():
     """Test that MockLLM includes document in output"""
     llm = MockLLM()
     doc = "Important content"
@@ -33,7 +36,7 @@ def test_mock_llm_includes_document():
         version=2,
     )
     rendered_prompt = prompt.render({"content": doc})
-    result = llm.generate(rendered_prompt)
+    result = await llm.generate(rendered_prompt)
 
     assert isinstance(result, LLMOutput)
     assert "Extract key points from:" in result.output_text
@@ -41,7 +44,8 @@ def test_mock_llm_includes_document():
     assert result.model_info.model == "mock"
 
 
-def test_mock_llm_with_custom_parameters():
+@pytest.mark.asyncio
+async def test_mock_llm_with_custom_parameters():
     """Test MockLLM with custom LLM parameters"""
     llm = MockLLM()
     doc = "Hello world"
@@ -55,7 +59,7 @@ def test_mock_llm_with_custom_parameters():
     rendered_prompt = prompt.render({"text": doc})
 
     # Custom params are accepted but ignored by MockLLM
-    result = llm.generate(rendered_prompt)
+    result = await llm.generate(rendered_prompt)
 
     assert isinstance(result, LLMOutput)
     assert "[MOCK OUTPUT]" in result.output_text
@@ -63,7 +67,8 @@ def test_mock_llm_with_custom_parameters():
     assert isinstance(result.latency_ms, (int, float))
 
 
-def test_mock_llm_empty_document():
+@pytest.mark.asyncio
+async def test_mock_llm_empty_document():
     """Test MockLLM with empty document"""
     llm = MockLLM()
     doc = ""
@@ -75,7 +80,7 @@ def test_mock_llm_empty_document():
         version=1,
     )
     rendered_prompt = prompt.render({"data": doc})
-    result = llm.generate(rendered_prompt)
+    result = await llm.generate(rendered_prompt)
 
     assert isinstance(result, LLMOutput)
     assert result.output_text is not None
@@ -83,7 +88,8 @@ def test_mock_llm_empty_document():
     assert result.model_info.model == "mock"
 
 
-def test_mock_llm_multiple_calls():
+@pytest.mark.asyncio
+async def test_mock_llm_multiple_calls():
     """Test MockLLM with multiple sequential calls"""
     llm = MockLLM()
 
@@ -107,8 +113,8 @@ def test_mock_llm_multiple_calls():
     rendered1 = prompt1.render({"x": doc1})
     rendered2 = prompt2.render({"y": doc2})
 
-    result1 = llm.generate(rendered1)
-    result2 = llm.generate(rendered2)
+    result1 = await llm.generate(rendered1)
+    result2 = await llm.generate(rendered2)
 
     assert isinstance(result1, LLMOutput)
     assert isinstance(result2, LLMOutput)
@@ -118,7 +124,8 @@ def test_mock_llm_multiple_calls():
     assert "doc2" in result2.output_text
 
 
-def test_mock_llm_response_structure():
+@pytest.mark.asyncio
+async def test_mock_llm_response_structure():
     """Test that LLMOutput has all required fields"""
     llm = MockLLM()
     doc = "test data"
@@ -126,7 +133,7 @@ def test_mock_llm_response_structure():
         id="p7", purpose="test", name="Test", template="Test: {{data}}", version=1
     )
     rendered_prompt = prompt.render({"data": doc})
-    result = llm.generate(rendered_prompt)
+    result = await llm.generate(rendered_prompt)
 
     assert isinstance(result, LLMOutput)
     assert hasattr(result, "output_text")

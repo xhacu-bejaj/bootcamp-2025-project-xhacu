@@ -1,7 +1,11 @@
+import pytest
+
+
 class TestPredictAPI:
     """Test prediction/processing endpoints"""
 
-    def test_predict_with_mock_provider(self, client):
+    @pytest.mark.asyncio
+    async def test_predict_with_mock_provider(self, client):
         """Test POST /v1/predict with mock provider"""
         payload = {
             "purpose": "translate",
@@ -19,7 +23,8 @@ class TestPredictAPI:
         assert data["model_info"]["model"] == "mock"
         assert "[MOCK OUTPUT]" in data["output_text"]
 
-    def test_predict_with_document_variations(self, client):
+    @pytest.mark.asyncio
+    async def test_predict_with_document_variations(self, client):
         """Test predict with various documents"""
         documents = [
             "Short text",
@@ -35,7 +40,8 @@ class TestPredictAPI:
             data = response.json()
             assert doc in data["output_text"]
 
-    def test_predict_required_fields(self, client):
+    @pytest.mark.asyncio
+    async def test_predict_required_fields(self, client):
         """Test predict with missing required fields"""
         # Missing document_text
         payload = {"purpose": "translate", "provider": "mock"}
@@ -51,7 +57,8 @@ class TestPredictAPI:
 class TestPredictAdvanced:
     """Advanced tests for prediction endpoint"""
 
-    def test_predict_returns_correct_prompt_id(self, client):
+    @pytest.mark.asyncio
+    async def test_predict_returns_correct_prompt_id(self, client):
         """Test that predict returns the correct prompt ID"""
         payload = {
             "purpose": "translate",
@@ -64,7 +71,8 @@ class TestPredictAdvanced:
         assert "prompt_id" in data
         assert data["prompt_id"] is not None
 
-    def test_predict_with_custom_temperature(self, client):
+    @pytest.mark.asyncio
+    async def test_predict_with_custom_temperature(self, client):
         """Test predict with custom LLM parameters"""
         payload = {
             "purpose": "translate",
@@ -77,7 +85,8 @@ class TestPredictAdvanced:
         data = response.json()
         assert "model_info" in data
 
-    def test_predict_returns_latency(self, client):
+    @pytest.mark.asyncio
+    async def test_predict_returns_latency(self, client):
         """Test that predict returns latency information"""
         payload = {
             "purpose": "translate",
@@ -90,7 +99,8 @@ class TestPredictAdvanced:
         assert "latency_ms" in data
         assert data["latency_ms"] >= 0
 
-    def test_predict_with_very_long_document(self, client):
+    @pytest.mark.asyncio
+    async def test_predict_with_very_long_document(self, client):
         """Test predict with very long document"""
         long_doc = "This is a test document. " * 500
         payload = {
@@ -103,7 +113,8 @@ class TestPredictAdvanced:
         data = response.json()
         assert long_doc in data["output_text"]
 
-    def test_predict_model_info_structure(self, client):
+    @pytest.mark.asyncio
+    async def test_predict_model_info_structure(self, client):
         """Test that model_info has correct structure"""
         payload = {"purpose": "translate", "document_text": "Test", "provider": "mock"}
         response = client.post("/v1/predict", json=payload)
@@ -118,7 +129,8 @@ class TestPredictAdvanced:
 class TestEdgeCases:
     """Test edge cases and error handling"""
 
-    def test_predict_empty_document(self, client):
+    @pytest.mark.asyncio
+    async def test_predict_empty_document(self, client):
         """Test predict with empty document"""
         payload = {"purpose": "translate", "document_text": "", "provider": "mock"}
         response = client.post("/v1/predict", json=payload)
@@ -128,7 +140,8 @@ class TestEdgeCases:
 class TestResponseValidation:
     """Tests for response validation"""
 
-    def test_predict_response_has_required_fields(self, client):
+    @pytest.mark.asyncio
+    async def test_predict_response_has_required_fields(self, client):
         """Test that predict response has all required fields"""
         payload = {"purpose": "translate", "document_text": "Test", "provider": "mock"}
         response = client.post("/v1/predict", json=payload)
