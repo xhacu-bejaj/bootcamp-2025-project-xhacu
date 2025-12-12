@@ -5,8 +5,9 @@ This module provides the core document processing functionality that:
 - Creates appropriate LLM clients based on provider
 - Generates processed documents using the LLM
 """
+from typing import Optional
 from app.models.domain import Prompt
-from app.models.schemas import PredictResponse
+from app.models.schemas import LLMOutput, LLMParams, PredictResponse
 from .llm_client_factory import LLMClientFactory
 from .prompt_store import PromptStore, UserId
 from app.core.logging import setup_logging, log_api_call
@@ -21,7 +22,7 @@ def process_document(
     purpose: str,
     document_text: str,
     provider: str,
-    **params,
+    params: Optional[LLMParams] = None,
 ) -> PredictResponse | None:
     """Process a document using an LLM based on the active prompt.
 
@@ -61,10 +62,15 @@ def process_document(
             f"{e}: Invalid provider: {provider}. Must be one of 'mock', 'openai', or 'google'."
         )
 
-    return llm_client.generate(
-        prompt,
+    generated_content: LLMOutput | None = llm_client.generate(prompt, params=params)
+    
+    if generated_content is None:
+        return None
+
+    return PredictResponse(
+        output_text=generated_content.output_text,
+        model_info=generated_content.model_info,
         prompt_id=active_prompt.id,
         prompt_version=active_prompt.version,
-        document_text=document_text,
-        **params,
+        latency_ms=generated_content.latency_ms,
     )
