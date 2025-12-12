@@ -15,24 +15,28 @@ from app.core.config import settings
 from app.models.domain import Chunk
 from app.core.logging import log_api_call
 
-
+# TODO : Add pagination support for retrieve_chunks if needed in future, and async
 class ChunkStore:
     """Service for storing and retrieving text chunks using ChromaDB."""
 
     def __init__(self):
-        """Initialize the ChunkStore with ChromaDB client and collection."""
+        """Initialize the ChunkStore with ChromaDB client."""
         self._client = chromadb.PersistentClient(
             path=settings.CHROMA_PERSIST_DIR,
             settings=ChromaSettings(anonymized_telemetry=False)
         )
-
         self._collection = self._client.get_or_create_collection(
             name=settings.CHROMA_COLLECTION_NAME,
             metadata={"hnsw:space": "cosine"}  # do anns using cosine similarity
         )
 
+    async def initialize(self):
+        """Asynchronously get or create the collection (no-op since initialized in __init__)."""
+        # Collection already initialized in __init__ for ChromaDB 0.5.x
+        pass
+
     @log_api_call
-    def insert_chunk(self, text: str, metadata: dict | None = None) -> Chunk:
+    async def insert_chunk(self, text: str, metadata: dict | None = None) -> Chunk:
         """
         Insert a text chunk into the vector database.
 
@@ -71,7 +75,7 @@ class ChunkStore:
         return Chunk(id=chunk_id, text=text, metadata=chunk_metadata)
 
     @log_api_call
-    def retrieve_chunks(self, query_text: str, n_chunks: int = 5) -> List[Chunk]:
+    async def retrieve_chunks(self, query_text: str, n_chunks: int = 5) -> List[Chunk]:
         """
         Retrieve the most similar chunks to the query text.
 
@@ -125,7 +129,7 @@ class ChunkStore:
         except Exception as e:
             raise RuntimeError(f"Failed to retrieve chunks from database: {str(e)}") from e
 
-    def count(self) -> int:
+    async def count(self) -> int:
         """
         Get the total number of chunks in the database.
 
@@ -134,7 +138,7 @@ class ChunkStore:
         """
         return self._collection.count()
 
-    def clear(self) -> None:
+    async def clear(self) -> None:
         """
         Clear all chunks from the database.
 
@@ -145,18 +149,3 @@ class ChunkStore:
             name=settings.CHROMA_COLLECTION_NAME,
             metadata={"hnsw:space": "cosine"}
         )
-
-_chunk_store_instance: ChunkStore | None = None
-
-
-def get_chunk_store() -> ChunkStore:
-    """
-    Get the singleton ChunkStore instance.
-
-    Returns:
-        ChunkStore instance
-    """
-    global _chunk_store_instance
-    if _chunk_store_instance is None:
-        _chunk_store_instance = ChunkStore()
-    return _chunk_store_instance
