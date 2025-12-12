@@ -262,8 +262,8 @@ class TestChunkingStrategyFactory:
         strategy1 = ChunkingStrategyFactory.get_strategy("phrase")
         strategy2 = ChunkingStrategyFactory.get_strategy("PHRASE")
         strategy3 = ChunkingStrategyFactory.get_strategy("Phrase")
-        
-        assert type(strategy1) == type(strategy2) == type(strategy3)
+
+        assert isinstance(strategy1, type(strategy2)) and isinstance(strategy1, type(strategy3))
 
     def test_get_strategy_with_custom_max_length(self):
         """Test creating strategy with custom max_length."""

@@ -4,10 +4,9 @@ from sqlalchemy import text
 from app.services.db import get_session
 
 from app.models.schemas import PromptCreate, PromptRead, PromptPatch
-from app.services.prompt_store import FileSnapshotStore, InMemoryStore, Purpose, UserId
+from app.services.prompt_store import Purpose, UserId
 from app.services.mongodb_store import MongoDBStore
 
-from app.core.config import settings
 from app.core.logging import setup_logging, log_api_call
 
 
@@ -16,7 +15,7 @@ setup_logging()
 prompt_router = APIRouter(prefix="/v1")
 
 # Import store from main to use the same instance across all routes
-from app.main import store
+from app.main import store  # noqa: E402
 
 
 @prompt_router.get("/health")

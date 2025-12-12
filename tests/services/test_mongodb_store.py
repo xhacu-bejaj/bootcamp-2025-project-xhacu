@@ -458,7 +458,6 @@ class TestStoreResponse:
     def test_store_response_success(self, mock_mongo_connection):
         """Test successfully storing a response."""
         from app.models.schemas import PredictResponse, LLMParams
-        from datetime import datetime
         
         mocks = mock_mongo_connection
         mock_responses_col = MagicMock()
@@ -641,8 +640,8 @@ class TestGetHistory:
         mocks["db"].__getitem__ = MagicMock(side_effect=get_collection)
         
         store = MongoDBStore(mongodb_uri="mongodb://localhost:27017/testdb")
-        results = store.get_history(limit=10, purpose="summarize")
-        
+        store.get_history(limit=10, purpose="summarize")
+
         # Verify query included purpose filter
         call_args = mock_responses_col.find.call_args[0][0]
         assert call_args["purpose"] == "summarize"

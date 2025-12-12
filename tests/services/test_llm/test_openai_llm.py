@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import Mock, patch
-from fastapi import HTTPException
 from app.models.domain import Prompt
 from app.models.schemas import LLMParams, LLMOutput
 from app.services.openai_llm import OpenaiLLM

@@ -5,8 +5,6 @@ This module tests the REST API for chunk insertion and retrieval.
 """
 
 import pytest
-from fastapi.testclient import TestClient
-from app.main import app
 from app.services.chunk_store import get_chunk_store
 
 

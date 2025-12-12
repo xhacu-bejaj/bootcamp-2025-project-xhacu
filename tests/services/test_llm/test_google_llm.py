@@ -1,4 +1,3 @@
-from fastapi import HTTPException
 import pytest
 from unittest.mock import Mock, patch
 from app.models.domain import Prompt
