@@ -1,10 +1,11 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends, HTTPException
 
 from app.models.schemas import HistoryItem
-from app.api.routes_prompts import store
+from app.services.prompt_store import PromptStore
 from app.services.mongodb_store import MongoDBStore
+from app.api.dependencies import get_store
 from app.core.logging import log_api_call
 
 history_router = APIRouter(prefix="/v1", tags=["history"])
@@ -12,10 +13,11 @@ history_router = APIRouter(prefix="/v1", tags=["history"])
 
 @history_router.get("/history", response_model=List[HistoryItem])
 @log_api_call
-def get_history(
+async def get_history(
     limit: int = Query(default=50, ge=1, le=1000),
     purpose: Optional[str] = Query(default=None),
     user_id: Optional[str] = Query(default=None),
+    store: PromptStore = Depends(get_store),
 ):
     """Get recent prediction history from MongoDB.
 
@@ -29,15 +31,16 @@ def get_history(
     """
 
     if not isinstance(store, MongoDBStore):
-        raise RuntimeError(
-            "History retrieval requires MongoDB store. "
-            "Please configure MONGODB_URI in your environment."
+        raise HTTPException(
+            status_code=400,
+            detail="History retrieval requires MongoDB store. "
+            "Please configure MONGODB_URI in your environment.",
         )
     
     purpose_filter = purpose if purpose else None
     user_id_filter = user_id if user_id else None
     
-    results = store.get_history(
+    results = await store.get_history(
         limit=limit, purpose=purpose_filter, user_id=user_id_filter
     )
   

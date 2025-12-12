@@ -4,8 +4,9 @@ from sqlalchemy import text
 from app.services.db import get_session
 
 from app.models.schemas import PromptCreate, PromptRead, PromptPatch
-from app.services.prompt_store import Purpose, UserId
+from app.services.prompt_store import PromptStore, Purpose, UserId
 from app.services.mongodb_store import MongoDBStore
+from app.api.dependencies import get_store
 
 from app.core.logging import setup_logging, log_api_call
 
@@ -13,9 +14,6 @@ from app.core.logging import setup_logging, log_api_call
 setup_logging()
 
 prompt_router = APIRouter(prefix="/v1")
-
-# Import store from main to use the same instance across all routes
-from app.main import store  # noqa: E402
 
 
 @prompt_router.get("/health")
@@ -26,10 +24,12 @@ def health():
 
 @prompt_router.post("/prompts", response_model=PromptCreate)
 @log_api_call
-def create_prompt(
-    data: PromptCreate, x_user_id: str = Header(default="user_anon")
+async def create_prompt(
+    data: PromptCreate,
+    x_user_id: str = Header(default="user_anon"),
+    store: PromptStore = Depends(get_store),
 ):  # ->PromptRead:
-    new_prompt = store.create(
+    new_prompt = await store.create(
         purpose=data.purpose, name=data.name, template=data.template
     )
     return new_prompt
@@ -37,8 +37,12 @@ def create_prompt(
 
 @prompt_router.get("/prompts/{purpose}", response_model=list[PromptRead])
 @log_api_call
-def list_prompts(purpose: Purpose, x_user_id: str = Header(default="user_anon")):
-    prompts_list = store.list(purpose)
+async def list_prompts(
+    purpose: Purpose,
+    x_user_id: str = Header(default="user_anon"),
+    store: PromptStore = Depends(get_store),
+):
+    prompts_list = await store.list(purpose)
     # Convert Prompt dataclass objects to dictionaries for Pydantic serialization
     return [
         {
@@ -55,10 +59,13 @@ def list_prompts(purpose: Purpose, x_user_id: str = Header(default="user_anon"))
 
 @prompt_router.patch("/prompts/{prompt_id}", response_model=PromptPatch)
 @log_api_call
-def patch_prompt(
-    prompt_id: str, data: PromptPatch, x_user_id: str = Header(default="user_anon")
+async def patch_prompt(
+    prompt_id: str,
+    data: PromptPatch,
+    x_user_id: str = Header(default="user_anon"),
+    store: PromptStore = Depends(get_store),
 ):
-    patched_prompt = store.patch(
+    patched_prompt = await store.patch(
         prompt_id=prompt_id, name=data.name, template=data.template
     )
     return patched_prompt
@@ -66,12 +73,13 @@ def patch_prompt(
 
 @prompt_router.post("/prompts/{prompt_id}/activate")
 @log_api_call
-def activate_prompt(
+async def activate_prompt(
     prompt_id: str,
     purpose: Purpose,
     x_user_id: str = Header(default="user_anon"),
+    store: PromptStore = Depends(get_store),
 ):
-    active_prompt = store.set_active(
+    active_prompt = await store.set_active(
         prompt_id=prompt_id, purpose=purpose, user_id=x_user_id
     )
     return active_prompt
@@ -79,8 +87,10 @@ def activate_prompt(
 
 @prompt_router.get("/get_active/{purpose}")
 @log_api_call
-def get_active(user_id: UserId, purpose: Purpose):
-    return store.get_active(user_id=user_id, purpose=purpose)
+async def get_active(
+    user_id: UserId, purpose: Purpose, store: PromptStore = Depends(get_store)
+):
+    return await store.get_active(user_id=user_id, purpose=purpose)
 
 
 @prompt_router.get("/health/db", tags=["DatabaseSQLAlchemy"])
@@ -110,7 +120,10 @@ async def db_health_check(session: AsyncSession = Depends(get_session)):
 
 @prompt_router.post("/prompts/export")
 @log_api_call
-def export_prompt_logs(x_user_id: str = Header(default="user_anon")):
+async def export_prompt_logs(
+    x_user_id: str = Header(default="user_anon"),
+    store: PromptStore = Depends(get_store),
+):
     """Export prompt usage logs to CSV file.
 
     Triggers CSV export of all prompt predictions from MongoDB responses collection
@@ -127,7 +140,7 @@ def export_prompt_logs(x_user_id: str = Header(default="user_anon")):
         )
     
     try:
-        export_path = store.export_prompt_usage_logs()
+        export_path = await store.export_prompt_usage_logs()
         return {
             "status": "success",
             "export_path": export_path,
