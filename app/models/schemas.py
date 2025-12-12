@@ -21,36 +21,31 @@ class PromptPatch(BaseModel):
     name: Optional[str] = None
     template: Optional[str] = None
 
-
 class LLMParams(BaseModel):
-    #model: str
-    temperature: Optional[float] = None
+    model: str
+    temperature: float
     model_config = {"extra": "forbid"}
-
 
 class PredictRequest(BaseModel):
     purpose: str
     document_text: str
-    params: Optional[LLMParams] = None 
+    params: Optional[LLMParams] = None  # explain why LLMParams 
     provider: str = "google"
-
-
-class ModelInfo(BaseModel):
-    model: str
-    temperature: float
-
 
 class PredictResponse(BaseModel):
     output_text: str
-    model_info: ModelInfo
+    model_info: LLMParams
     prompt_id: str
     prompt_version: int
     latency_ms: int
 
+class LLMOutput(BaseModel):
+    output_text: str
+    latency_ms: int
+    model_info: LLMParams
 
 class OutputSchema(BaseModel):
     output_text: str
-
 
 class HistoryItem(BaseModel):
     timestamp: str
@@ -61,7 +56,6 @@ class HistoryItem(BaseModel):
     provider: str
     model: str
     prompt_version: int
-
 
 class ChunkMetadataInput(BaseModel):
     """Schema for chunk metadata input"""
