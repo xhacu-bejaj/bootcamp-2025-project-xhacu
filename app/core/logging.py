@@ -56,6 +56,8 @@ def setup_logging() -> logging.Logger:
 API_LOGGER = setup_logging()
 
 
+import asyncio
+
 def log_api_call(func: Callable[..., Any]) -> Callable[..., Any]:
     """Decorator to log function calls with timing and results.
     
@@ -65,7 +67,7 @@ def log_api_call(func: Callable[..., Any]) -> Callable[..., Any]:
     - Return value at completion
     - Exception details if errors occur
     
-    Note: Only supports synchronous functions. Do not use with async functions.
+    Supports both synchronous and asynchronous functions.
     
     Args:
         func: Function to decorate
@@ -114,4 +116,46 @@ def log_api_call(func: Callable[..., Any]) -> Callable[..., Any]:
 
             raise
 
-    return wrapper
+    @functools.wraps(func)
+    async def async_wrapper(*args, **kwargs) -> Any:
+        func_name = func.__name__
+        start_time = time.perf_counter()
+
+        try:
+            args_repr = [repr(a) for a in args]
+            kwargs_repr = [f"{k}={v!r}" for k, v in kwargs.items()]
+            signature = ", ".join(args_repr + kwargs_repr)
+
+            API_LOGGER.info(f"[{func_name}] START Execution. Args: ({signature})")
+
+            result = await func(*args, **kwargs)
+
+            end_time = time.perf_counter()
+            latency_ms = int((end_time - start_time) * 1000)
+
+            result_repr = repr(result)
+            API_LOGGER.info(
+                f"[{func_name}] END Execution. Latency: {latency_ms}ms. Return: {result_repr}"
+            )
+
+            return result
+
+        except Exception as e:
+            try:
+                end_time = time.perf_counter()
+                latency_ms = int((end_time - start_time) * 1000)
+            except NameError:
+                latency_ms = "N/A"
+
+            API_LOGGER.error(
+                f"[{func_name}] EXCEPTION raised. Latency: {latency_ms}. "
+                f"Type: {type(e).__name__}: {e}",
+                exc_info=False,
+            )
+
+            raise
+
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return wrapper
