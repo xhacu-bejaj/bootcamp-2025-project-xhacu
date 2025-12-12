@@ -11,12 +11,13 @@ from app.models.schemas import LLMOutput, LLMParams, PredictResponse
 from .llm_client_factory import LLMClientFactory
 from .prompt_store import PromptStore, UserId
 from app.core.logging import setup_logging, log_api_call
+from app.core.exceptions import PromptNotFoundError, ConfigurationError
 from app.services.llm_client import LLMClient
 
 setup_logging()
 
 @log_api_call
-def process_document(
+async def process_document(
     store: PromptStore,
     user_id: UserId,
     purpose: str,
@@ -42,14 +43,14 @@ def process_document(
         or None if processing fails
 
     Raises:
-        ValueError: If no active prompt is found for the user/purpose combination
-        ValueError: If the provider is invalid or not supported
+        PromptNotFoundError: If no active prompt is found for the user/purpose combination
+        ConfigurationError: If the provider is invalid or not supported
     """
 
-    active_prompt: Prompt | None = store.get_active(user_id, purpose)
+    active_prompt: Prompt | None = await store.get_active(user_id, purpose)
 
     if not active_prompt:
-        raise ValueError(
+        raise PromptNotFoundError(
             f"No active prompt found for user: {user_id}, purpose: {purpose}"
         )
 
@@ -58,11 +59,11 @@ def process_document(
     try:
         llm_client: LLMClient = LLMClientFactory().create_client(provider)
     except ValueError as e:
-        raise ValueError(
+        raise ConfigurationError(
             f"{e}: Invalid provider: {provider}. Must be one of 'mock', 'openai', or 'google'."
         )
 
-    generated_content: LLMOutput | None = llm_client.generate(prompt, params=params)
+    generated_content: LLMOutput | None = await llm_client.generate(prompt, params=params)
     
     if generated_content is None:
         return None
@@ -74,3 +75,4 @@ def process_document(
         prompt_version=active_prompt.version,
         latency_ms=generated_content.latency_ms,
     )
+

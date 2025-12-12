@@ -8,7 +8,7 @@ from app.services.llm_client import LLMClient
 
 class MockLLM(LLMClient):
     @log_api_call
-    def generate(self, prompt: str, params: Optional[LLMParams] = None) -> LLMOutput | None:
+    async def generate(self, prompt: str, params: Optional[LLMParams] = None) -> LLMOutput | None:
         start_time = time.perf_counter()
 
         mock_output = (

@@ -3,6 +3,7 @@ from uuid import uuid4
 from typing import Dict, List, Tuple, TypeAlias
 import json
 import os
+import asyncio
 
 from ..models.domain import Prompt
 from app.core.logging import setup_logging, log_api_call
@@ -16,7 +17,7 @@ Purpose: TypeAlias = str
 
 class PromptStore(ABC):
     @abstractmethod
-    def create(
+    async def create(
         self,
         purpose: Purpose,
         name: str,
@@ -24,22 +25,22 @@ class PromptStore(ABC):
     ) -> Prompt: ...
 
     @abstractmethod
-    def list(
+    async def list(
         self,
         purpose: Purpose | None = None,
     ) -> list[Prompt]: ...
 
     @abstractmethod
-    def get(
+    async def get(
         self,
         prompt_id: PromptId,
     ) -> Prompt | None: ...
 
     @abstractmethod
-    def patch(self, prompt_id: PromptId, template: str, name: str) -> Prompt | None: ...
+    async def patch(self, prompt_id: PromptId, template: str, name: str) -> Prompt | None: ...
 
     @abstractmethod
-    def set_active(
+    async def set_active(
         self,
         user_id: UserId,
         purpose: Purpose,
@@ -47,7 +48,7 @@ class PromptStore(ABC):
     ) -> Prompt | None: ...
 
     @abstractmethod
-    def get_active(
+    async def get_active(
         self,
         user_id: UserId,
         purpose: Purpose,
@@ -61,21 +62,21 @@ class InMemoryStore(PromptStore):
         self._active_prompts: Dict[Tuple[UserId, Purpose], PromptId] = {}
 
     @log_api_call
-    def create(self, purpose: Purpose, name: str, template: str) -> Prompt:
+    async def create(self, purpose: Purpose, name: str, template: str) -> Prompt:
         new_prompt = Prompt(str(uuid4()), purpose, name, template)
         self._prompts.append(new_prompt)
         return new_prompt
 
     @log_api_call
-    def list(self, purpose: Purpose) -> list[Prompt]:  # | None
+    async def list(self, purpose: Purpose) -> list[Prompt]:  # | None
         return [p for p in self._prompts if p.purpose == purpose]
 
     @log_api_call
-    def get(self, prompt_id: PromptId) -> Prompt | None:
+    async def get(self, prompt_id: PromptId) -> Prompt | None:
         return next((p for p in self._prompts if p.id == prompt_id), None)
 
     @log_api_call
-    def patch(
+    async def patch(
         self, prompt_id: PromptId, name: str | None = None, template: str | None = None
     ) -> Prompt | None:
         for prompt in self._prompts:
@@ -98,7 +99,7 @@ class InMemoryStore(PromptStore):
         return None
 
     @log_api_call
-    def set_active(
+    async def set_active(
         self, user_id: UserId, purpose: Purpose, prompt_id: PromptId
     ) -> Prompt | None:
         new_active_prompt = next((p for p in self._prompts if p.id == prompt_id), None)
@@ -118,7 +119,7 @@ class InMemoryStore(PromptStore):
         return new_active_prompt
 
     @log_api_call
-    def get_active(self, user_id: UserId, purpose: Purpose) -> Prompt | None:
+    async def get_active(self, user_id: UserId, purpose: Purpose) -> Prompt | None:
         active_prompt_id = self._active_prompts.get((user_id, purpose))
     
         if active_prompt_id is None:
@@ -138,9 +139,9 @@ class FileSnapshotStore(InMemoryStore):
         """
         super().__init__()
         self.filepath = filepath
-        self._load()
+        self._load_sync()
 
-    def _load(self):
+    def _load_sync(self):
         """Load data from JSON file if it exists.
         
         Deserializes prompts and active_prompts from JSON file.
@@ -173,7 +174,7 @@ class FileSnapshotStore(InMemoryStore):
                 self._prompts = []
                 self._active_prompts = {}
 
-    def _save(self):
+    def _save_sync(self):
         """Save current state to JSON file.
         
         Serializes all prompts and active_prompts to JSON file.
@@ -216,7 +217,10 @@ class FileSnapshotStore(InMemoryStore):
             print(f"Error: Failed to save to {self.filepath}: {e}")
             raise IOError(f"Failed to save prompts to {self.filepath}: {e}")
 
-    def create(self, purpose: Purpose, name: str, template: str) -> Prompt:
+    async def _save(self):
+        await asyncio.to_thread(self._save_sync)
+
+    async def create(self, purpose: Purpose, name: str, template: str) -> Prompt:
         """Create a new prompt and save to file.
         
         Args:
@@ -227,11 +231,11 @@ class FileSnapshotStore(InMemoryStore):
         Returns:
             Newly created Prompt instance
         """
-        result = super().create(purpose, name, template)
-        self._save()
+        result = await super().create(purpose, name, template)
+        await self._save()
         return result
 
-    def patch(
+    async def patch(
         self, prompt_id: PromptId, name: str | None = None, template: str | None = None
     ) -> Prompt | None:
         """Update a prompt and save to file.
@@ -244,12 +248,12 @@ class FileSnapshotStore(InMemoryStore):
         Returns:
             Updated Prompt instance or None if not found
         """
-        result = super().patch(prompt_id, name, template)
+        result = await super().patch(prompt_id, name, template)
         if result is not None:
-            self._save()
+            await self._save()
         return result
 
-    def set_active(
+    async def set_active(
         self, user_id: UserId, purpose: Purpose, prompt_id: PromptId
     ) -> Prompt | None:
         """Set active prompt and save to file.
@@ -262,7 +266,7 @@ class FileSnapshotStore(InMemoryStore):
         Returns:
             Activated Prompt instance or None if not found
         """
-        result = super().set_active(user_id, purpose, prompt_id)
+        result = await super().set_active(user_id, purpose, prompt_id)
         if result is not None:
-            self._save()
+            await self._save()
         return result

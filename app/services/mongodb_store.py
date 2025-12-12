@@ -4,8 +4,10 @@ from datetime import datetime, timezone
 import csv
 import os
 from pathlib import Path
+import asyncio
 
-from pymongo import MongoClient
+
+from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import ServerSelectionTimeoutError, ConnectionFailure
 
 from ..models.domain import Prompt
@@ -36,8 +38,7 @@ class MongoDBStore(PromptStore):
             raise ValueError("MONGODB_URI must be provided or set in environment")
 
         try:
-            self.client: MongoClient = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            self.client.admin.command("ping")
+            self.client: AsyncIOMotorClient = AsyncIOMotorClient(uri, serverSelectionTimeoutMS=5000)
         except (ServerSelectionTimeoutError, ConnectionFailure) as e:
             raise ConnectionFailure(f"Failed to connect to MongoDB at {uri}: {e}")
 
@@ -53,26 +54,29 @@ class MongoDBStore(PromptStore):
         self.active_prompts_collection = self.db[active_col_name]
         self.responses_collection = self.db["responses"]
 
-        self._create_indexes()
+    async def initialize(self):
+        """Run async-only initialization tasks."""
+        await self.client.admin.command("ping")
+        await self._create_indexes()
 
-    def _create_indexes(self):
+    async def _create_indexes(self):
         """Create indexes for common queries."""
         try:
-            self.prompts_collection.create_index("purpose")
-            self.prompts_collection.create_index([("purpose", 1), ("version", -1)])
+            await self.prompts_collection.create_index("purpose")
+            await self.prompts_collection.create_index([("purpose", 1), ("version", -1)])
         except Exception:
             pass
 
         try:
-            self.active_prompts_collection.create_index(
+            await self.active_prompts_collection.create_index(
                 [("user_id", 1), ("purpose", 1)], unique=True
             )
         except Exception:
             pass
 
         try:
-            self.responses_collection.create_index([("prompt_id", 1), ("timestamp", -1)])
-            self.responses_collection.create_index(
+            await self.responses_collection.create_index([("prompt_id", 1), ("timestamp", -1)])
+            await self.responses_collection.create_index(
                 [("user_id", 1), ("purpose", 1), ("timestamp", -1)]
             )
         except Exception:
@@ -101,7 +105,7 @@ class MongoDBStore(PromptStore):
         }
 
     @log_api_call
-    def create(self, purpose: Purpose, name: str, template: str) -> Prompt:
+    async def create(self, purpose: Purpose, name: str, template: str) -> Prompt:
         """Create a new prompt.
 
         Args:
@@ -122,11 +126,11 @@ class MongoDBStore(PromptStore):
         )
 
         doc = self._prompt_to_doc(prompt)
-        self.prompts_collection.insert_one(doc)
+        await self.prompts_collection.insert_one(doc)
         return prompt
 
     @log_api_call
-    def list(self, purpose: Purpose | None = None) -> list[Prompt]:
+    async def list(self, purpose: Purpose | None = None) -> list[Prompt]:
         """List all prompts for a given purpose.
 
         Args:
@@ -136,11 +140,12 @@ class MongoDBStore(PromptStore):
             List of Prompt objects
         """
         query = {"purpose": purpose} if purpose is not None else {}
-        docs = self.prompts_collection.find(query)
+        cursor = self.prompts_collection.find(query)
+        docs = await cursor.to_list(length=None)
         return [self._doc_to_prompt(doc) for doc in docs] 
 
     @log_api_call
-    def get(self, prompt_id: PromptId) -> Prompt | None:
+    async def get(self, prompt_id: PromptId) -> Prompt | None:
         """Retrieve a prompt by ID.
 
         Args:
@@ -149,11 +154,11 @@ class MongoDBStore(PromptStore):
         Returns:
             Prompt object or None if not found
         """
-        doc = self.prompts_collection.find_one({"_id": prompt_id})
+        doc = await self.prompts_collection.find_one({"_id": prompt_id})
         return self._doc_to_prompt(doc) if doc else None
 
     @log_api_call
-    def patch(
+    async def patch(
         self, prompt_id: PromptId, name: str | None = None, template: str | None = None
     ) -> Prompt | None:
         """Update a prompt's name and/or template.
@@ -175,7 +180,7 @@ class MongoDBStore(PromptStore):
             update_dict["template"] = template
 
         if update_dict:
-            result = self.prompts_collection.find_one_and_update(
+            result = await self.prompts_collection.find_one_and_update(
                 {"_id": prompt_id},
                 {"$set": update_dict, "$inc": {"version": 1}},
                 return_document=True,
@@ -183,10 +188,10 @@ class MongoDBStore(PromptStore):
 
             return self._doc_to_prompt(result) if result else None
 
-        return self.get(prompt_id)
+        return await self.get(prompt_id)
 
     @log_api_call
-    def set_active(
+    async def set_active(
         self, user_id: UserId, purpose: Purpose, prompt_id: PromptId
     ) -> Prompt | None:
         """Set a prompt as active for a user and purpose.
@@ -199,34 +204,34 @@ class MongoDBStore(PromptStore):
         Returns:
             The activated Prompt object or None if prompt not found
         """
-        prompt = self.get(prompt_id)
+        prompt = await self.get(prompt_id)
         if not prompt:
             return None
 
-        active_doc = self.active_prompts_collection.find_one(
+        active_doc = await self.active_prompts_collection.find_one(
             {"user_id": user_id, "purpose": purpose}
         )
 
         if active_doc:
             old_prompt_id = active_doc["prompt_id"]
-            self.prompts_collection.update_one(
+            await self.prompts_collection.update_one(
                 {"_id": old_prompt_id}, {"$set": {"active": False}}
             )
 
-        self.active_prompts_collection.update_one(
+        await self.active_prompts_collection.update_one(
             {"user_id": user_id, "purpose": purpose},
             {"$set": {"prompt_id": prompt_id}},
             upsert=True,
         )
 
-        self.prompts_collection.update_one(
+        await self.prompts_collection.update_one(
             {"_id": prompt_id}, {"$set": {"active": True}}
         )
 
-        return self.get(prompt_id)
+        return await self.get(prompt_id)
 
     @log_api_call
-    def get_active(self, user_id: UserId, purpose: Purpose) -> Prompt | None:
+    async def get_active(self, user_id: UserId, purpose: Purpose) -> Prompt | None:
         """Retrieve the active prompt for a user and purpose.
 
         Args:
@@ -236,17 +241,17 @@ class MongoDBStore(PromptStore):
         Returns:
             Active Prompt object or None if not set
         """
-        active_doc = self.active_prompts_collection.find_one(
+        active_doc = await self.active_prompts_collection.find_one(
             {"user_id": user_id, "purpose": purpose}
         )
 
         if not active_doc:
             return None
 
-        return self.get(active_doc["prompt_id"])
+        return await self.get(active_doc["prompt_id"])
 
     @log_api_call
-    def store_response(
+    async def store_response(
         self, response: PredictResponse, user_id: str, purpose: str
     ) -> None:
         """Store an LLM response as a document in responses collection.
@@ -267,10 +272,10 @@ class MongoDBStore(PromptStore):
             "timestamp": datetime.now(timezone.utc),
         }
 
-        self.responses_collection.insert_one(doc)
+        await self.responses_collection.insert_one(doc)
 
     @log_api_call
-    def get_history(
+    async def get_history(
         self, limit: int = 50, purpose: Optional[str] = None, user_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get recent predictions from MongoDB.
@@ -296,7 +301,7 @@ class MongoDBStore(PromptStore):
         )
 
         results = []
-        for doc in cursor:
+        async for doc in cursor:
             results.append(
                 {
                     "timestamp": doc["timestamp"],
@@ -310,31 +315,8 @@ class MongoDBStore(PromptStore):
                 }
             )
         return results
-
-    @log_api_call
-    def export_prompt_usage_logs(
-        self, output_path: Optional[str] = None
-    ) -> str:
-        """Export prompt usage logs from responses collection to CSV.
-
-        Args:
-            output_path: Path where CSV file will be written.
-                        If None, uses var/exports/prompt_logs.csv (relative to project root)
-
-        Returns:
-            Path to the created CSV file
-
-        Raises:
-            IOError: If CSV file cannot be created
-        """
-
-        if output_path is None:
-            output_path = os.path.join("var", "exports", "prompt_logs.csv")
-
-        output_dir = os.path.dirname(output_path)
-        if output_dir:
-            Path(output_dir).mkdir(parents=True, exist_ok=True)
-
+    
+    def _export_sync(self, output_path: str):
         documents = list(self.responses_collection.find().sort("timestamp", -1))
 
         fieldnames = [
@@ -345,7 +327,7 @@ class MongoDBStore(PromptStore):
             "latency_ms",
             "model_info",
         ]
-
+        
         try:
             with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
                 
@@ -368,11 +350,38 @@ class MongoDBStore(PromptStore):
                         "model_info": model_info_str,
                     }
                     writer.writerow(row)
-
-            return output_path
         except IOError as e:
             raise IOError(f"Failed to write CSV file to {output_path}: {str(e)}")
 
-    def close(self):
+
+    @log_api_call
+    async def export_prompt_usage_logs(
+        self, output_path: Optional[str] = None
+    ) -> str:
+        """Export prompt usage logs from responses collection to CSV.
+
+        Args:
+            output_path: Path where CSV file will be written.
+                        If None, uses var/exports/prompt_logs.csv (relative to project root)
+
+        Returns:
+            Path to the created CSV file
+
+        Raises:
+            IOError: If CSV file cannot be created
+        """
+
+        if output_path is None:
+            output_path = os.path.join("var", "exports", "prompt_logs.csv")
+
+        output_dir = os.path.dirname(output_path)
+        if output_dir:
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+        
+        await asyncio.to_thread(self._export_sync, output_path)
+
+        return output_path
+
+    async def close(self):
         """Close MongoDB connection."""
         self.client.close()
