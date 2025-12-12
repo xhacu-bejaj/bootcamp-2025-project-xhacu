@@ -1,135 +1,3 @@
-class TestHealthEndpoints:
-    """Test health check endpoints"""
-
-    def test_health_endpoint(self, client):
-        """Test GET /v1/health"""
-        response = client.get("/v1/health")
-        assert response.status_code == 200
-        assert response.json() == {"status": "ok"}
-
-    def test_db_health_endpoint(self, client):
-        """Test GET /health/db"""
-        response = client.get("/health/db")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "ok"
-        assert "message" in data
-
-
-class TestPromptsAPI:
-    """Test prompt management endpoints"""
-
-    def test_create_prompt(self, client):
-        """Test POST /v1/prompts - Create a new prompt"""
-        payload = {
-            "purpose": "test_purpose",
-            "name": "Test Prompt",
-            "template": "test template",
-        }
-        response = client.post("/v1/prompts", json=payload)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["purpose"] == "test_purpose"
-        assert data["name"] == "Test Prompt"
-        assert data["template"] == "test template"
-
-    def test_list_prompts_by_purpose(self, client):
-        """Test GET /v1/prompts/{purpose} - List prompts by purpose"""
-    
-        payload = {
-            "purpose": "translate",
-            "name": "Translator",
-            "template": "translate to spanish",
-        }
-        client.post("/v1/prompts", json=payload)
-
-        response = client.get("/v1/prompts/translate")
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
-        assert len(data) > 0
-      
-        for prompt in data:
-            assert prompt["purpose"] == "translate"
-
-    def test_list_prompts_empty_purpose(self, client):
-        """Test GET /v1/prompts/{purpose} - List for non-existent purpose"""
-        response = client.get("/v1/prompts/nonexistent_purpose_xyz")
-        assert response.status_code == 200
-        data = response.json()
-        assert data == []
-
-    def test_patch_prompt(self, client):
-        """Test PATCH /v1/prompts/{prompt_id} - Update a prompt"""
-        
-        payload = {
-            "purpose": "extract",
-            "name": "Original Name",
-            "template": "original template",
-        }
-        create_response = client.post("/v1/prompts", json=payload)
-        prompt_id = create_response.json()["purpose"]  
-
-        list_response = client.get("/v1/prompts/extract")
-        if list_response.json():
-            prompt_id = list_response.json()[0]["id"]
-
-            patch_payload = {"name": "Updated Name", "template": "updated template"}
-            response = client.patch(f"/v1/prompts/{prompt_id}", json=patch_payload)
-            assert response.status_code == 200
-            data = response.json()
-            assert data["name"] == "Updated Name"
-            assert data["template"] == "updated template"
-
-    def test_activate_prompt(self, client):
-        """Test POST /v1/prompts/{prompt_id}/activate - Activate a prompt"""
-
-        payload = {
-            "purpose": "summarize",
-            "name": "Summarizer",
-            "template": "summarize this",
-        }
-        client.post("/v1/prompts", json=payload)
-
-        list_response = client.get("/v1/prompts/summarize")
-        if list_response.json():
-            prompt_id = list_response.json()[0]["id"]
-
-            response = client.post(
-                f"/v1/prompts/{prompt_id}/activate?purpose=summarize",
-                headers={"x-user-id": "test_user"},
-            )
-            assert response.status_code == 200
-            data = response.json()
-            assert data["active"]
-            assert data["purpose"] == "summarize"
-
-    def test_get_active_prompt(self, client):
-        """Test GET /v1/get_active/{purpose} - Get active prompt"""
-
-        payload = {
-            "purpose": "classify",
-            "name": "Classifier",
-            "template": "classify this",
-        }
-        client.post("/v1/prompts", json=payload)
-
-        list_response = client.get("/v1/prompts/classify")
-        if list_response.json():
-            prompt_id = list_response.json()[0]["id"]
-            client.post(
-                f"/v1/prompts/{prompt_id}/activate?purpose=classify",
-                headers={"x-user-id": "test_user_2"},
-            )
-
-            response = client.get("/v1/get_active/classify?user_id=test_user_2")
-            assert response.status_code == 200
-            data = response.json()
-            if data:  
-                assert data["active"]
-                assert data["purpose"] == "classify"
-
-
 class TestPredictAPI:
     """Test prediction/processing endpoints"""
 
@@ -180,23 +48,98 @@ class TestPredictAPI:
         assert response.status_code == 422  # Validation error
 
 
+class TestPredictAdvanced:
+    """Advanced tests for prediction endpoint"""
+
+    def test_predict_returns_correct_prompt_id(self, client):
+        """Test that predict returns the correct prompt ID"""
+        payload = {
+            "purpose": "translate",
+            "document_text": "Test document",
+            "provider": "mock",
+        }
+        response = client.post("/v1/predict", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert "prompt_id" in data
+        assert data["prompt_id"] is not None
+
+    def test_predict_with_custom_temperature(self, client):
+        """Test predict with custom LLM parameters"""
+        payload = {
+            "purpose": "translate",
+            "document_text": "Test document",
+            "provider": "mock",
+            "params": {"model": "gpt-4o-mini", "temperature": 0.7},
+        }
+        response = client.post("/v1/predict", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert "model_info" in data
+
+    def test_predict_returns_latency(self, client):
+        """Test that predict returns latency information"""
+        payload = {
+            "purpose": "translate",
+            "document_text": "Test document",
+            "provider": "mock",
+        }
+        response = client.post("/v1/predict", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert "latency_ms" in data
+        assert data["latency_ms"] >= 0
+
+    def test_predict_with_very_long_document(self, client):
+        """Test predict with very long document"""
+        long_doc = "This is a test document. " * 500
+        payload = {
+            "purpose": "translate",
+            "document_text": long_doc,
+            "provider": "mock",
+        }
+        response = client.post("/v1/predict", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert long_doc in data["output_text"]
+
+    def test_predict_model_info_structure(self, client):
+        """Test that model_info has correct structure"""
+        payload = {"purpose": "translate", "document_text": "Test", "provider": "mock"}
+        response = client.post("/v1/predict", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        model_info = data["model_info"]
+        assert "model" in model_info
+        assert "temperature" in model_info
+        assert isinstance(model_info["temperature"], (int, float))
+
+
 class TestEdgeCases:
     """Test edge cases and error handling"""
-
-    def test_empty_prompt_name(self, client):
-        """Test creating prompt with empty name"""
-        payload = {"purpose": "test", "name": "", "template": "test template"}
-        response = client.post("/v1/prompts", json=payload)
-        assert response.status_code == 200
-
-    def test_empty_template(self, client):
-        """Test creating prompt with empty template"""
-        payload = {"purpose": "test", "name": "Test", "template": ""}
-        response = client.post("/v1/prompts", json=payload)
-        assert response.status_code == 200
 
     def test_predict_empty_document(self, client):
         """Test predict with empty document"""
         payload = {"purpose": "translate", "document_text": "", "provider": "mock"}
         response = client.post("/v1/predict", json=payload)
         assert response.status_code == 200
+
+
+class TestResponseValidation:
+    """Tests for response validation"""
+
+    def test_predict_response_has_required_fields(self, client):
+        """Test that predict response has all required fields"""
+        payload = {"purpose": "translate", "document_text": "Test", "provider": "mock"}
+        response = client.post("/v1/predict", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        required_fields = [
+            "output_text",
+            "model_info",
+            "prompt_id",
+            "prompt_version",
+            "latency_ms",
+        ]
+        for field in required_fields:
+            assert field in data

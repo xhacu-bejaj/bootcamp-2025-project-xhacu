@@ -281,71 +281,23 @@ class TestGetActivePrompt:
                 assert data["id"] == prompt_id
 
 
-class TestPredictAdvanced:
-    """Advanced tests for prediction endpoint"""
 
-    def test_predict_returns_correct_prompt_id(self, client):
-        """Test that predict returns the correct prompt ID"""
-        payload = {
-            "purpose": "translate",
-            "document_text": "Test document",
-            "provider": "mock",
-        }
-        response = client.post("/v1/predict", json=payload)
+class TestHealthEndpoints:
+    """Test health check endpoints"""
+
+    def test_health_endpoint(self, client):
+        """Test GET /v1/health"""
+        response = client.get("/v1/health")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
+
+    def test_db_health_endpoint(self, client):
+        """Test GET /health/db"""
+        response = client.get("/health/db")
         assert response.status_code == 200
         data = response.json()
-        assert "prompt_id" in data
-        assert data["prompt_id"] is not None
-
-    def test_predict_with_custom_temperature(self, client):
-        """Test predict with custom LLM parameters"""
-        payload = {
-            "purpose": "translate",
-            "document_text": "Test document",
-            "provider": "mock",
-            "params": {"model": "gpt-4o-mini", "temperature": 0.7},
-        }
-        response = client.post("/v1/predict", json=payload)
-        assert response.status_code == 200
-        data = response.json()
-        assert "model_info" in data
-
-    def test_predict_returns_latency(self, client):
-        """Test that predict returns latency information"""
-        payload = {
-            "purpose": "translate",
-            "document_text": "Test document",
-            "provider": "mock",
-        }
-        response = client.post("/v1/predict", json=payload)
-        assert response.status_code == 200
-        data = response.json()
-        assert "latency_ms" in data
-        assert data["latency_ms"] >= 0
-
-    def test_predict_with_very_long_document(self, client):
-        """Test predict with very long document"""
-        long_doc = "This is a test document. " * 500
-        payload = {
-            "purpose": "translate",
-            "document_text": long_doc,
-            "provider": "mock",
-        }
-        response = client.post("/v1/predict", json=payload)
-        assert response.status_code == 200
-        data = response.json()
-        assert long_doc in data["output_text"]
-
-    def test_predict_model_info_structure(self, client):
-        """Test that model_info has correct structure"""
-        payload = {"purpose": "translate", "document_text": "Test", "provider": "mock"}
-        response = client.post("/v1/predict", json=payload)
-        assert response.status_code == 200
-        data = response.json()
-        model_info = data["model_info"]
-        assert "model" in model_info
-        assert "temperature" in model_info
-        assert isinstance(model_info["temperature"], (int, float))
+        assert data["status"] == "ok"
+        assert "message" in data
 
 
 class TestResponseValidation:
@@ -369,18 +321,28 @@ class TestResponseValidation:
         data = response.json()
         assert isinstance(data, list)
 
-    def test_predict_response_has_required_fields(self, client):
-        """Test that predict response has all required fields"""
-        payload = {"purpose": "translate", "document_text": "Test", "provider": "mock"}
-        response = client.post("/v1/predict", json=payload)
-        assert response.status_code == 200
-        data = response.json()
-        required_fields = [
-            "output_text",
-            "model_info",
-            "prompt_id",
-            "prompt_version",
-            "latency_ms",
-        ]
-        for field in required_fields:
-            assert field in data
+
+from unittest.mock import patch
+
+class TestExportEndpoint:
+    """Tests for the export endpoint"""
+
+    def test_export_fails_with_in_memory_store(self, client):
+        """Test that export fails when not using MongoDB (default test setup)"""
+        response = client.post("/v1/prompts/export")
+        assert response.status_code == 400
+        assert "Export requires MongoDB store" in response.json()["detail"]
+
+    def test_export_succeeds_with_mocked_mongodb_store(self, client):
+        """Test that export succeeds when the store is mocked to be a MongoDBStore"""
+        with patch("app.api.routes_prompts.isinstance") as mock_isinstance:
+            mock_isinstance.return_value = True
+            with patch("app.api.routes_prompts.store") as mock_store:
+                mock_store.export_prompt_usage_logs.return_value = "/path/to/logs.csv"
+                response = client.post("/v1/prompts/export")
+
+                assert response.status_code == 200
+                json_response = response.json()
+                assert json_response["status"] == "success"
+                assert json_response["export_path"] == "/path/to/logs.csv"
+                mock_store.export_prompt_usage_logs.assert_called_once()
