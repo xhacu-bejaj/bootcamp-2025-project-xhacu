@@ -19,11 +19,10 @@ def predict_prompt(
 ):
     purpose = req.purpose
     document_text = req.document_text
-    llm_params_dict = req.params.model_dump(exclude_none=True) if req.params else {}
     provider = req.provider
 
     post_process_doc = process_document(
-        store, x_user_id, purpose, document_text, provider, **llm_params_dict
+        store, x_user_id, purpose, document_text, provider, params=req.params
     )
 
     # Store response only if using MongoDB store
