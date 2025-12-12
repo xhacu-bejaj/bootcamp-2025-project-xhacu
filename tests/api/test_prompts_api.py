@@ -303,7 +303,7 @@ class TestPredictAdvanced:
             "purpose": "translate",
             "document_text": "Test document",
             "provider": "mock",
-            "params": {"temperature": 0.7},
+            "params": {"model": "gpt-4o-mini", "temperature": 0.7},
         }
         response = client.post("/v1/predict", json=payload)
         assert response.status_code == 200

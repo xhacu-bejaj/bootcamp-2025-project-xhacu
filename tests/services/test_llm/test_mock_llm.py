@@ -1,10 +1,10 @@
 from app.models.domain import Prompt
-from app.models.schemas import PredictResponse
+from app.models.schemas import LLMOutput
 from app.services.mock_llm import MockLLM
 
 
 def test_mock_llm_generate_returns_predict_response():
-    """Test that MockLLM.generate returns PredictResponse object"""
+    """Test that MockLLM.generate returns LLMOutput object"""
     llm = MockLLM()
     doc = "Test document"
     prompt = Prompt(
@@ -12,14 +12,9 @@ def test_mock_llm_generate_returns_predict_response():
     )
     rendered_prompt = prompt.render({"text": doc})
 
-    result = llm.generate(
-        rendered_prompt,
-        prompt_id=prompt.id,
-        prompt_version=prompt.version,
-        document_text=doc,
-    )
+    result = llm.generate(rendered_prompt)
 
-    assert isinstance(result, PredictResponse)
+    assert isinstance(result, LLMOutput)
     assert result.output_text is not None
     assert "[MOCK OUTPUT]" in result.output_text
     assert "Summarize:" in result.output_text
@@ -38,14 +33,9 @@ def test_mock_llm_includes_document():
         version=2,
     )
     rendered_prompt = prompt.render({"content": doc})
-    result = llm.generate(
-        rendered_prompt,
-        prompt_id=prompt.id,
-        prompt_version=prompt.version,
-        document_text=doc,
-    )
+    result = llm.generate(rendered_prompt)
 
-    assert isinstance(result, PredictResponse)
+    assert isinstance(result, LLMOutput)
     assert "Extract key points from:" in result.output_text
     assert "Important content" in result.output_text
     assert result.model_info.model == "mock"
@@ -64,17 +54,10 @@ def test_mock_llm_with_custom_parameters():
     )
     rendered_prompt = prompt.render({"text": doc})
 
-    result = llm.generate(
-        rendered_prompt,
-        prompt_id=prompt.id,
-        prompt_version=prompt.version,
-        document_text=doc,
-        temperature=0.9,
-        max_tokens=100,
-        top_p=0.8,
-    )
+    # Custom params are accepted but ignored by MockLLM
+    result = llm.generate(rendered_prompt)
 
-    assert isinstance(result, PredictResponse)
+    assert isinstance(result, LLMOutput)
     assert "[MOCK OUTPUT]" in result.output_text
     assert "Translate to Spanish:" in result.output_text
     assert isinstance(result.latency_ms, (int, float))
@@ -92,14 +75,9 @@ def test_mock_llm_empty_document():
         version=1,
     )
     rendered_prompt = prompt.render({"data": doc})
-    result = llm.generate(
-        rendered_prompt,
-        prompt_id=prompt.id,
-        prompt_version=prompt.version,
-        document_text=doc,
-    )
+    result = llm.generate(rendered_prompt)
 
-    assert isinstance(result, PredictResponse)
+    assert isinstance(result, LLMOutput)
     assert result.output_text is not None
     assert "Analyze:" in result.output_text
     assert result.model_info.model == "mock"
@@ -129,21 +107,11 @@ def test_mock_llm_multiple_calls():
     rendered1 = prompt1.render({"x": doc1})
     rendered2 = prompt2.render({"y": doc2})
 
-    result1 = llm.generate(
-        rendered1,
-        prompt_id=prompt1.id,
-        prompt_version=prompt1.version,
-        document_text=doc1,
-    )
-    result2 = llm.generate(
-        rendered2,
-        prompt_id=prompt2.id,
-        prompt_version=prompt2.version,
-        document_text=doc2,
-    )
+    result1 = llm.generate(rendered1)
+    result2 = llm.generate(rendered2)
 
-    assert isinstance(result1, PredictResponse)
-    assert isinstance(result2, PredictResponse)
+    assert isinstance(result1, LLMOutput)
+    assert isinstance(result2, LLMOutput)
     assert "Template1:" in result1.output_text
     assert "Template2:" in result2.output_text
     assert "doc1" in result1.output_text
@@ -151,21 +119,16 @@ def test_mock_llm_multiple_calls():
 
 
 def test_mock_llm_response_structure():
-    """Test that PredictResponse has all required fields"""
+    """Test that LLMOutput has all required fields"""
     llm = MockLLM()
     doc = "test data"
     prompt = Prompt(
         id="p7", purpose="test", name="Test", template="Test: {{data}}", version=1
     )
     rendered_prompt = prompt.render({"data": doc})
-    result = llm.generate(
-        rendered_prompt,
-        prompt_id=prompt.id,
-        prompt_version=prompt.version,
-        document_text=doc,
-    )
+    result = llm.generate(rendered_prompt)
 
-    assert isinstance(result, PredictResponse)
+    assert isinstance(result, LLMOutput)
     assert hasattr(result, "output_text")
     assert hasattr(result, "model_info")
     assert hasattr(result, "latency_ms")

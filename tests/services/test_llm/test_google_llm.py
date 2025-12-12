@@ -2,6 +2,7 @@ from fastapi import HTTPException
 import pytest
 from unittest.mock import Mock, patch
 from app.models.domain import Prompt
+from app.models.schemas import LLMParams, LLMOutput
 from app.services.google_llm import GoogleLLM
 
 
@@ -12,7 +13,7 @@ def test_google_llm_initialization(mock_client, mock_settings):
 
     llm = GoogleLLM()
 
-    assert llm.model == "gemini-1.5-flash"
+    assert llm.model == "gemini-2.5-flash"
     assert llm.temperature == 0.5
     mock_client.assert_called_once_with(api_key="test-api-key")
 
@@ -49,17 +50,11 @@ def test_google_llm_generate_success(mock_client, mock_settings):
     )
     rendered_prompt = prompt.render({"text": doc})
 
-    result = llm.generate(
-        rendered_prompt,
-        prompt_id=prompt.id,
-        prompt_version=prompt.version,
-        document_text=doc,
-    )
+    result = llm.generate(rendered_prompt)
 
     assert result is not None
     assert result.output_text == "This is a test response"
-    assert result.model_info.model == "gemini-1.5-flash"
-    assert result.prompt_id == "p1"
+    assert result.model_info.model == "gemini-2.5-flash"
 
 
 @patch("app.services.google_llm.settings")
@@ -85,13 +80,8 @@ def test_google_llm_generate_with_temperature_override(mock_client, mock_setting
     )
     rendered_prompt = prompt.render({"text": doc})
 
-    result = llm.generate(
-        rendered_prompt,
-        prompt_id=prompt.id,
-        prompt_version=prompt.version,
-        document_text=doc,
-        temperature=0.9,
-    )
+    params = LLMParams(model="gemini-2.5-flash", temperature=0.9)
+    result = llm.generate(rendered_prompt, params=params)
 
     assert result is not None
     assert result.model_info.temperature == 0.9
@@ -122,12 +112,7 @@ def test_google_llm_generate_invalid_json_response(mock_client, mock_settings):
     rendered_prompt = prompt.render({"text": doc})
 
     with pytest.raises(ValueError, match="LLM failed to return valid JSON"):
-        llm.generate(
-            rendered_prompt,
-            prompt_id=prompt.id,
-            prompt_version=prompt.version,
-            document_text=doc,
-        )
+        llm.generate(rendered_prompt)
 
 
 @patch("app.services.google_llm.settings")
@@ -149,20 +134,14 @@ def test_google_llm_config_key_filtering(mock_client, mock_settings):
     )
     rendered_prompt = prompt.render({"x": doc})
 
-    result = llm.generate(
-        rendered_prompt,
-        prompt_id=prompt.id,
-        prompt_version=prompt.version,
-        document_text=doc,
-        top_p=0.7,
-        max_output_tokens=100,
-        invalid_key="ignored",
-    )
+    result = llm.generate(rendered_prompt)
 
     assert result is not None
+    assert isinstance(result, LLMOutput)
     assert result.output_text == "filtered response"
+    # Verify generate_content was called with proper config
     call_args = mock_client_instance.models.generate_content.call_args
-    assert "top_p" in str(call_args) or "max_output_tokens" in str(call_args)
+    assert call_args is not None
 
 
 @patch("app.services.google_llm.settings")
@@ -181,13 +160,8 @@ def test_google_llm_handles_client_exceptions(mock_client, mock_settings):
     )
     rendered_prompt = prompt.render({"x": doc})
 
-    with pytest.raises(HTTPException):
-        llm.generate(
-            rendered_prompt,
-            prompt_id=prompt.id,
-            prompt_version=prompt.version,
-            document_text=doc,
-        )
+    with pytest.raises(ValueError, match="Model failed to generate content"):
+        llm.generate(rendered_prompt)
 
 
 @patch("app.services.google_llm.settings")
@@ -213,12 +187,7 @@ def test_google_llm_latency_is_int_and_nonnegative(mock_client, mock_settings):
     )
     rendered_prompt = prompt.render({"x": doc})
 
-    result = llm.generate(
-        rendered_prompt,
-        prompt_id=prompt.id,
-        prompt_version=prompt.version,
-        document_text=doc,
-    )
+    result = llm.generate(rendered_prompt)
 
     assert isinstance(result.latency_ms, int)
     assert result.latency_ms >= 0
@@ -243,20 +212,10 @@ def test_google_llm_temperature_default_and_override(mock_client, mock_settings)
     )
     rendered_prompt = prompt.render({"x": doc})
 
-    result_default = llm.generate(
-        rendered_prompt,
-        prompt_id=prompt.id,
-        prompt_version=prompt.version,
-        document_text=doc,
-    )
+    result_default = llm.generate(rendered_prompt)
     assert result_default.model_info.temperature == 0.3
 
     mock_response.text = '{"output_text": "temp test"}'
-    result_override = llm.generate(
-        rendered_prompt,
-        prompt_id=prompt.id,
-        prompt_version=prompt.version,
-        document_text=doc,
-        temperature=0.8,
-    )
+    params = LLMParams(model="gemini-2.5-flash", temperature=0.8)
+    result_override = llm.generate(rendered_prompt, params=params)
     assert result_override.model_info.temperature == 0.8

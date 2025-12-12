@@ -457,7 +457,7 @@ class TestStoreResponse:
 
     def test_store_response_success(self, mock_mongo_connection):
         """Test successfully storing a response."""
-        from app.models.schemas import PredictResponse, ModelInfo
+        from app.models.schemas import PredictResponse, LLMParams
         from datetime import datetime
         
         mocks = mock_mongo_connection
@@ -478,7 +478,7 @@ class TestStoreResponse:
         
         response = PredictResponse(
             output_text="Test output",
-            model_info=ModelInfo(model="gpt-4", temperature=0.7),
+            model_info=LLMParams(model="gpt-4", temperature=0.7),
             prompt_id="prompt123",
             prompt_version=2,
             latency_ms=150
@@ -492,7 +492,7 @@ class TestStoreResponse:
 
     def test_store_response_includes_timestamp(self, mock_mongo_connection):
         """Test that stored response includes timestamp."""
-        from app.models.schemas import PredictResponse, ModelInfo
+        from app.models.schemas import PredictResponse, LLMParams
         from datetime import datetime
         
         mocks = mock_mongo_connection
@@ -513,7 +513,7 @@ class TestStoreResponse:
         
         response = PredictResponse(
             output_text="Test",
-            model_info=ModelInfo(model="gpt-4", temperature=0.5),
+            model_info=LLMParams(model="gpt-4", temperature=0.5),
             prompt_id="p1",
             prompt_version=1,
             latency_ms=100
@@ -528,7 +528,7 @@ class TestStoreResponse:
 
     def test_store_response_includes_all_fields(self, mock_mongo_connection):
         """Test that all required fields are stored."""
-        from app.models.schemas import PredictResponse, ModelInfo
+        from app.models.schemas import PredictResponse, LLMParams
         
         mocks = mock_mongo_connection
         mock_responses_col = MagicMock()
@@ -548,7 +548,7 @@ class TestStoreResponse:
         
         response = PredictResponse(
             output_text="Output text",
-            model_info=ModelInfo(model="gpt-4o", temperature=0.8),
+            model_info=LLMParams(model="gpt-4o", temperature=0.8),
             prompt_id="prompt_abc",
             prompt_version=3,
             latency_ms=200

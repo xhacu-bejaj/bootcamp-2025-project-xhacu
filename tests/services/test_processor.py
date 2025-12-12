@@ -1,7 +1,7 @@
 import pytest
 from app.services.processor import process_document
 from app.services.prompt_store import InMemoryStore
-from app.models.schemas import PredictResponse
+from app.models.schemas import PredictResponse, LLMParams
 
 
 def test_process_document_returns_predict_response():
@@ -51,14 +51,15 @@ def test_process_document_with_custom_parameters():
     prompt = store.create(purpose, "Extractor", "Extract: {{text}}")
     store.set_active(user_id, purpose, prompt.id)
 
+    params = LLMParams(model="mock", temperature=0.5)
+    
     result = process_document(
         store=store,
         user_id=user_id,
         purpose=purpose,
         document_text="Important data to extract",
         provider="mock",
-        temperature=0.5,
-        max_tokens=100,
+        params=params,
     )
 
     assert isinstance(result, PredictResponse)
