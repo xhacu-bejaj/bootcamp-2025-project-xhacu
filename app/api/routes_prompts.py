@@ -22,7 +22,7 @@ def health():
     return {"status": "ok"}
 
 
-@prompt_router.post("/prompts", response_model=PromptCreate)
+@prompt_router.post("/prompts", response_model=PromptRead)
 @log_api_call
 async def create_prompt(
     data: PromptCreate,
@@ -57,7 +57,7 @@ async def list_prompts(
     ]
 
 
-@prompt_router.patch("/prompts/{prompt_id}", response_model=PromptPatch)
+@prompt_router.patch("/prompts/{prompt_id}", response_model=PromptRead)
 @log_api_call
 async def patch_prompt(
     prompt_id: str,
@@ -65,9 +65,14 @@ async def patch_prompt(
     x_user_id: str = Header(default="user_anon"),
     store: PromptStore = Depends(get_store),
 ):
-    patched_prompt = await store.patch(
-        prompt_id=prompt_id, name=data.name, template=data.template
-    )
+    # Only pass non-None values to patch
+    kwargs = {}
+    if data.name is not None:
+        kwargs["name"] = data.name
+    if data.template is not None:
+        kwargs["template"] = data.template
+    
+    patched_prompt = await store.patch(prompt_id=prompt_id, **kwargs)
     return patched_prompt
 
 

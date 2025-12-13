@@ -15,6 +15,7 @@ from app.models.schemas import PredictResponse
 from app.core.logging import log_api_call
 from app.core.config import settings
 from app.services.prompt_store import PromptStore
+from app.core.exceptions import PromptNotFoundError # Added import
 
 UserId: TypeAlias = str
 PromptId: TypeAlias = str
@@ -145,17 +146,39 @@ class MongoDBStore(PromptStore):
         return [self._doc_to_prompt(doc) for doc in docs] 
 
     @log_api_call
-    async def get(self, prompt_id: PromptId) -> Prompt | None:
+    async def get(self, prompt_id: PromptId) -> Prompt: # Changed return type to Prompt
         """Retrieve a prompt by ID.
 
         Args:
             prompt_id: ID of the prompt to retrieve
 
         Returns:
-            Prompt object or None if not found
+            Prompt object
+
+        Raises:
+            PromptNotFoundError: If the prompt with the given ID is not found.
         """
         doc = await self.prompts_collection.find_one({"_id": prompt_id})
-        return self._doc_to_prompt(doc) if doc else None
+        if not doc:
+            raise PromptNotFoundError(f"Prompt with ID {prompt_id} not found")
+        return self._doc_to_prompt(doc)
+
+    @log_api_call
+    async def delete(self, prompt_id: PromptId) -> bool:
+        """Delete a prompt by ID.
+
+        Args:
+            prompt_id: ID of the prompt to delete.
+
+        Returns:
+            True if the prompt was deleted, False otherwise.
+        """
+        # First, find and potentially remove any active mappings for this prompt
+        await self.active_prompts_collection.delete_many({"prompt_id": prompt_id})
+
+        # Then, delete the prompt itself
+        result = await self.prompts_collection.delete_one({"_id": prompt_id})
+        return result.deleted_count > 0
 
     @log_api_call
     async def patch(
@@ -316,8 +339,11 @@ class MongoDBStore(PromptStore):
             )
         return results
     
-    def _export_sync(self, output_path: str):
-        documents = list(self.responses_collection.find().sort("timestamp", -1))
+    async def _export_to_csv(self, output_path: str):
+        """Export documents to CSV asynchronously."""
+        # Fetch all documents asynchronously
+        cursor = self.responses_collection.find().sort("timestamp", -1)
+        documents = await cursor.to_list(length=None)
 
         fieldnames = [
             "created_at",
@@ -328,30 +354,32 @@ class MongoDBStore(PromptStore):
             "model_info",
         ]
         
-        try:
-            with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
-                
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writeheader()
+        # Write to file in thread pool to avoid blocking
+        def write_csv():
+            try:
+                with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    writer.writeheader()
 
-                for doc in documents:
-
-                    model_info = doc.get("model_info", {})
-                    model_info_str = f"{model_info.get('model', 'unknown')};temp={model_info.get('temperature', 'N/A')}"
-                    
-                    row = {
-                        "created_at": doc.get("timestamp", "").isoformat()
-                        if doc.get("timestamp")
-                        else "",
-                        "prompt_id": doc.get("prompt_id", ""),
-                        "user_id": doc.get("user_id", ""),
-                        "purpose": doc.get("purpose", ""),
-                        "latency_ms": doc.get("latency_ms", 0),
-                        "model_info": model_info_str,
-                    }
-                    writer.writerow(row)
-        except IOError as e:
-            raise IOError(f"Failed to write CSV file to {output_path}: {str(e)}")
+                    for doc in documents:
+                        model_info = doc.get("model_info", {})
+                        model_info_str = f"{model_info.get('model', 'unknown')};temp={model_info.get('temperature', 'N/A')}"
+                        
+                        row = {
+                            "created_at": doc.get("timestamp", "").isoformat()
+                            if doc.get("timestamp")
+                            else "",
+                            "prompt_id": doc.get("prompt_id", ""),
+                            "user_id": doc.get("user_id", ""),
+                            "purpose": doc.get("purpose", ""),
+                            "latency_ms": doc.get("latency_ms", 0),
+                            "model_info": model_info_str,
+                        }
+                        writer.writerow(row)
+            except IOError as e:
+                raise IOError(f"Failed to write CSV file to {output_path}: {str(e)}")
+        
+        await asyncio.to_thread(write_csv)
 
 
     @log_api_call
@@ -378,10 +406,9 @@ class MongoDBStore(PromptStore):
         if output_dir:
             Path(output_dir).mkdir(parents=True, exist_ok=True)
         
-        await asyncio.to_thread(self._export_sync, output_path)
-
+        await self._export_to_csv(output_path)
         return output_path
-
+    
     async def close(self):
         """Close MongoDB connection."""
         self.client.close()

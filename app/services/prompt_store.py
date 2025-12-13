@@ -27,7 +27,7 @@ class PromptStore(ABC):
     @abstractmethod
     async def list(
         self,
-        purpose: Purpose | None = None,
+        purpose: Purpose | None = None, # maybe add filtering by user_id later
     ) -> list[Prompt]: ...
 
     @abstractmethod
