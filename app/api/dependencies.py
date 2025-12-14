@@ -2,6 +2,7 @@ from fastapi import Request
 
 from app.services.prompt_store import PromptStore
 from app.services.chunk_store import ChunkStore
+from app.context import app_context
 
 
 def get_store(request: Request) -> PromptStore:
@@ -11,8 +12,8 @@ def get_store(request: Request) -> PromptStore:
     return request.app.state.prompt_store
 
 
-def get_chunk_store(request: Request) -> ChunkStore:
+def get_chunk_store() -> ChunkStore:
     """
-    Dependency to get the chunk store instance from the application state.
+    Dependency to get the shared chunk store instance from the app context.
     """
-    return request.app.state.chunk_store
+    return app_context.chunk_store

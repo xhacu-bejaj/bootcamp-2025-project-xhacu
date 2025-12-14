@@ -16,3 +16,4 @@ appunti.md
 *.ipynb
 *.ini
 *.mako
+data.raw.json

@@ -12,8 +12,15 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from app.services.vector_store_factory import VectorStoreFactory
+from app.context import app_context
 from app.core.config import settings
+from app.services.chunk_store import ChunkStore # Import ChunkStore
+
+# Initialize ChunkStore here for the agent's tools to use
+# In a full application, this would be handled by the app startup.
+# For standalone agent testing, this ensures the tool has access to the store.
+if not app_context.chunk_store:
+    app_context.chunk_store = ChunkStore()
 
 
 def get_datetime() -> str:
@@ -43,24 +50,11 @@ def search_knowledge_base(query: str, n_results: int = 5) -> str:
     n_results = max(1, min(n_results, 20))
     
     try:
-        # Create vector store instance
-        vector_store = VectorStoreFactory.create_vector_store()
-        
-        # Run the async retrieve_chunks method
-        try:
-            # Try to get existing event loop
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Create a new loop in a thread if one is already running
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(asyncio.run, vector_store.retrieve_chunks(query, n_results))
-                    chunks = future.result()
-            else:
-                chunks = loop.run_until_complete(vector_store.retrieve_chunks(query, n_results))
-        except RuntimeError:
-            # No event loop, create one
-            chunks = asyncio.run(vector_store.retrieve_chunks(query, n_results))
+        # Use the shared chunk_store instance from the app context
+        if not app_context.chunk_store:
+            return "Error: ChunkStore not initialized."
+
+        chunks = app_context.chunk_store.retrieve_chunks(query, n_results)
         
         if not chunks:
             return "No relevant information found in the knowledge base."

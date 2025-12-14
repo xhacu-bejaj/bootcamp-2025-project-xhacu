@@ -7,6 +7,7 @@ from app.services.prompt_store import PromptStore
 from app.services.mongodb_store import MongoDBStore
 from app.api.dependencies import get_store
 from app.core.logging import log_api_call
+from app.core.context import request_id_var
 
 history_router = APIRouter(prefix="/v1", tags=["history"])
 
@@ -44,7 +45,9 @@ async def get_history(
         limit=limit, purpose=purpose_filter, user_id=user_id_filter
     )
   
+    request_id = request_id_var.get()
     for item in results:
         if "timestamp" in item and hasattr(item["timestamp"], "isoformat"):
             item["timestamp"] = item["timestamp"].isoformat()
+        item["request_id"] = request_id
     return results

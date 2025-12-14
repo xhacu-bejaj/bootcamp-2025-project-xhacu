@@ -4,12 +4,23 @@ Text chunking strategies for breaking documents into smaller pieces.
 This module provides abstract interfaces and concrete implementations
 for chunking text documents while respecting maximum chunk lengths.
 """
-
 from abc import ABC, abstractmethod
 import re
 from typing import List
 
 from app.core.config import settings
+
+try:
+    from nltk.tokenize import sent_tokenize
+except ImportError:
+    print("NLTK not found. Please install it: pip install nltk")
+    # Provide a fallback or raise an error
+    def sent_tokenize(text: str) -> List[str]:
+        # Simple regex-based sentence tokenizer as a fallback
+        import re
+        sentence_pattern = re.compile(r'(?<=[.!?])\s+(?=[A-Z])')
+        return sentence_pattern.split(text)
+
 
 
 class ChunkingStrategy(ABC):
@@ -213,11 +224,119 @@ class PhraseChunkingStrategy(ChunkingStrategy):
         return chunks
 
 
+
+
+try:
+    from nltk.tokenize import sent_tokenize
+except ImportError:
+    print("NLTK not found. Please install it: pip install nltk")
+    # Provide a fallback or raise an error
+    def sent_tokenize(text: str) -> List[str]:
+        # Simple regex-based sentence tokenizer as a fallback
+        import re
+        sentence_pattern = re.compile(r'(?<=[.!?])\s+(?=[A-Z])')
+        return sentence_pattern.split(text)
+
+
+class SemanticChunkingStrategy(ChunkingStrategy):
+    """
+    Chunking strategy that splits text by paragraphs and then sentences using NLTK.
+    """
+
+    def chunk_text(self, text: str) -> List[str]:
+        """
+        Split text into chunks by paragraphs and then sentences.
+        """
+        if not text or not text.strip():
+            return []
+
+        chunks: List[str] = []
+        paragraphs = text.split('\n\n')
+
+        for paragraph in paragraphs:
+            paragraph = paragraph.strip()
+            if not paragraph:
+                continue
+
+            if len(paragraph) <= self.max_length:
+                chunks.append(paragraph)
+            else:
+                sentences = self._split_into_sentences(paragraph)
+                current_chunk = ""
+                for sentence in sentences:
+                    sentence = sentence.strip()
+                    if not sentence:
+                        continue
+                    
+                    if len(sentence) > self.max_length:
+                        # If a sentence is too long, split it by words
+                        if current_chunk:
+                            chunks.append(current_chunk)
+                        chunks.extend(self._split_long_text(sentence))
+                        current_chunk = ""
+                        continue
+
+                    test_chunk = f"{current_chunk} {sentence}".strip()
+                    if len(test_chunk) <= self.max_length:
+                        current_chunk = test_chunk
+                    else:
+                        if current_chunk:
+                            chunks.append(current_chunk.strip())
+                        current_chunk = sentence
+
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+        
+        return chunks
+
+    def _split_into_sentences(self, text: str) -> List[str]:
+        """
+        Split text into sentences using NLTK.
+        """
+        return sent_tokenize(text)
+
+    def _split_long_text(self, text: str) -> List[str]:
+        """
+        Split text that exceeds max_length into smaller chunks by words.
+        """
+        chunks: List[str] = []
+        words = text.split()
+
+        if not words:
+            return []
+
+        current_chunk = ""
+        for word in words:
+            if len(word) > self.max_length:
+                # If a single word is too long, we have to split it.
+                if current_chunk:
+                    chunks.append(current_chunk)
+                
+                for i in range(0, len(word), self.max_length):
+                    chunks.append(word[i:i+self.max_length])
+                current_chunk = ""
+                continue
+
+            test_chunk = f"{current_chunk} {word}".strip()
+            if len(test_chunk) <= self.max_length:
+                current_chunk = test_chunk
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                current_chunk = word
+        
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        return chunks
+
+
 class ChunkingStrategyFactory:
     """Factory for creating chunking strategy instances."""
 
     _strategies: dict[str, type[ChunkingStrategy]] = {
         "phrase": PhraseChunkingStrategy,
+        "semantic": SemanticChunkingStrategy,
     }
 
     @classmethod

@@ -49,12 +49,12 @@ async def process_document(
 
     active_prompt: Prompt | None = await store.get_active(user_id, purpose)
 
-    if not active_prompt:
+    if not active_prompt or not active_prompt.template:
         raise PromptNotFoundError(
-            f"No active prompt found for user: {user_id}, purpose: {purpose}"
+            f"No active prompt with a valid template found for user: {user_id}, purpose: {purpose}"
         )
 
-    prompt = active_prompt.render({"document_text": document_text})
+    prompt = active_prompt.render({"text": document_text})
 
     try:
         llm_client: LLMClient = LLMClientFactory().create_client(provider)

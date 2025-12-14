@@ -1,7 +1,13 @@
 """API routes for interacting with the AI agent."""
 from fastapi import APIRouter, Header
-from pydantic import BaseModel, Field
-from typing import Optional
+from app.models.schemas import (
+    AgentRequest, 
+    AgentResponse, 
+    TraceEventThought, 
+    TraceEventToolCall, 
+    TraceEventToolOutput,
+    TraceEventFinalResponse
+)
 import sys
 import os
 from pathlib import Path
@@ -29,18 +35,6 @@ agent_router = APIRouter(prefix="/v1")
 session_service = InMemorySessionService()
 
 
-class AgentRequest(BaseModel):
-    """Request model for agent interaction."""
-    query: str = Field(..., description="The question or prompt for the agent", examples=["What information do you have about machine learning?"])
-    user_id: Optional[str] = Field(None, description="Optional user identifier for tracking")
-
-
-class AgentResponse(BaseModel):
-    """Response model for agent interaction."""
-    response: str = Field(..., description="The agent's response")
-    user_id: str = Field(..., description="User identifier")
-    request_id: Optional[str] = None
-
 
 @agent_router.post("/agent/query", response_model=AgentResponse, tags=["Agent"])
 @log_api_call
@@ -57,20 +51,24 @@ async def query_agent(
     - Provide the current date and time
     
     Args:
-        req: Request containing the user's query
+        req: Request containing the user's query, and optionally a session_id
         x_user_id: User identifier from header
         
     Returns:
-        AgentResponse with the agent's answer
+        AgentResponse with the agent's answer and session_id
     """
     # Use user_id from request body if provided, otherwise use header
     user_id = req.user_id if req.user_id else x_user_id
     
-    # Generate a unique session_id for each request (stateless API calls)
-    session_id = str(uuid.uuid4())
+    # Use existing session_id or create a new one for a new conversation
+    session_id = req.session_id if req.session_id else str(uuid.uuid4())
     
-    # Create the session in the session service
-    await session_service.create_session(app_name="knowledge_base_agent", user_id=user_id, session_id=session_id)
+    # Create a new session only if one doesn't already exist
+    existing_session = await session_service.get_session(
+        app_name="knowledge_base_agent", user_id=user_id, session_id=session_id
+    )
+    if not existing_session:
+        await session_service.create_session(app_name="knowledge_base_agent", user_id=user_id, session_id=session_id)
     
     # Create the message content from the user query
     new_message = Content(
@@ -87,16 +85,37 @@ async def query_agent(
     
     # Collect all events from the async generator
     response_text = ""
+    trace = []
     async for event in runner.run_async(
         user_id=user_id,
         session_id=session_id,
         new_message=new_message
     ):
-        # Extract text from event content if available
-        if event.content and event.content.parts:
-            for part in event.content.parts:
-                if hasattr(part, 'text') and part.text:
-                    response_text += part.text
+        # Safely check for and capture all known event types
+        if thought := getattr(event, 'thought', None):
+            trace.append(TraceEventThought(content=thought))
+
+        if tool_code := getattr(event, 'tool_code', None):
+            for tool_call in tool_code:
+                trace.append(TraceEventToolCall(
+                    tool_name=tool_call.name,
+                    args=tool_call.args
+                ))
+
+        if tool_output := getattr(event, 'tool_output', None):
+            for tool_out in tool_output:
+                trace.append(TraceEventToolOutput(
+                    tool_name=tool_out.tool_name,
+                    output=str(tool_out.output) # Ensure output is a string
+                ))
+
+        if content := getattr(event, 'content', None):
+            if content.parts:
+                for part in content.parts:
+                    if text := getattr(part, 'text', None):
+                        response_text += text
+                        trace.append(TraceEventFinalResponse(content=text))
+
     
     # If no response was collected, provide a default message
     if not response_text:
@@ -105,5 +124,7 @@ async def query_agent(
     return AgentResponse(
         response=response_text,
         user_id=user_id,
-        request_id=request_id_var.get()
+        session_id=session_id,
+        request_id=request_id_var.get() or "N/A",
+        trace=trace
     )

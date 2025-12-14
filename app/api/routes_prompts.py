@@ -9,6 +9,7 @@ from app.services.mongodb_store import MongoDBStore
 from app.api.dependencies import get_store
 
 from app.core.logging import setup_logging, log_api_call
+from app.core.context import request_id_var
 
 
 setup_logging()
@@ -19,7 +20,7 @@ prompt_router = APIRouter(prefix="/v1")
 @prompt_router.get("/health")
 @log_api_call
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "request_id": request_id_var.get()}
 
 
 @prompt_router.post("/prompts", response_model=PromptRead)
@@ -32,7 +33,7 @@ async def create_prompt(
     new_prompt = await store.create(
         purpose=data.purpose, name=data.name, template=data.template
     )
-    return new_prompt
+    return {**new_prompt.__dict__, "request_id": request_id_var.get()}
 
 
 @prompt_router.get("/prompts/{purpose}", response_model=list[PromptRead])
@@ -46,12 +47,8 @@ async def list_prompts(
     # Convert Prompt dataclass objects to dictionaries for Pydantic serialization
     return [
         {
-            "id": p.id,
-            "purpose": p.purpose,
-            "name": p.name,
-            "template": p.template,
-            "version": p.version,
-            "active": p.active,
+            **p.__dict__,
+            "request_id": request_id_var.get(),
         }
         for p in prompts_list
     ]
@@ -73,7 +70,9 @@ async def patch_prompt(
         kwargs["template"] = data.template
     
     patched_prompt = await store.patch(prompt_id=prompt_id, **kwargs)
-    return patched_prompt
+    if patched_prompt:
+        return {**patched_prompt.__dict__, "request_id": request_id_var.get()}
+    return None
 
 
 @prompt_router.post("/prompts/{prompt_id}/activate")
@@ -87,7 +86,9 @@ async def activate_prompt(
     active_prompt = await store.set_active(
         prompt_id=prompt_id, purpose=purpose, user_id=x_user_id
     )
-    return active_prompt
+    if active_prompt:
+        return {**active_prompt.__dict__, "request_id": request_id_var.get()}
+    return None
 
 
 @prompt_router.get("/get_active/{purpose}")
@@ -95,7 +96,10 @@ async def activate_prompt(
 async def get_active(
     user_id: UserId, purpose: Purpose, store: PromptStore = Depends(get_store)
 ):
-    return await store.get_active(user_id=user_id, purpose=purpose)
+    active_prompt = await store.get_active(user_id=user_id, purpose=purpose)
+    if active_prompt:
+        return {**active_prompt.__dict__, "request_id": request_id_var.get()}
+    return None
 
 
 @prompt_router.get("/health/db", tags=["DatabaseSQLAlchemy"])
@@ -150,6 +154,7 @@ async def export_prompt_logs(
             "status": "success",
             "export_path": export_path,
             "message": "Prompt usage logs exported successfully",
+            "request_id": request_id_var.get()
         }
     except IOError as e:
         raise HTTPException(

@@ -31,6 +31,7 @@ from app.core.exceptions import (
 )
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.context import app_context
 
 
 @asynccontextmanager
@@ -53,8 +54,8 @@ async def lifespan(app: FastAPI):
     app.state.prompt_store = prompt_store
 
     chunk_store = ChunkStore()
-    await chunk_store.initialize()
-    app.state.chunk_store = chunk_store
+    chunk_store.initialize()
+    app_context.chunk_store = chunk_store
     
     yield
     
@@ -63,7 +64,9 @@ async def lifespan(app: FastAPI):
         await app.state.prompt_store.close()
 
 
+from app.middleware import add_request_id_middleware
 app = FastAPI(title="Prompted Doc Processor", version="0.1.0", lifespan=lifespan)
+app.middleware("http")(add_request_id_middleware)
 
 app.add_exception_handler(HTTPException, http_exception_handler) # type: ignore
 app.add_exception_handler(PromptNotFoundError, prompt_not_found_handler) # type: ignore
@@ -78,12 +81,14 @@ from app.api.routes_predict import predict_router  # noqa: E402
 from app.api.routes_db import db_router  # noqa: E402
 from app.api.routes_history import history_router  # noqa: E402
 from app.api.routes_chunks import chunk_router  # noqa: E402
+from app.api.routes_agent import agent_router  # noqa: E402
 
 app.include_router(prompt_router)
 app.include_router(predict_router)
 app.include_router(db_router)
 app.include_router(history_router)
 app.include_router(chunk_router)
+app.include_router(agent_router)
 
 
 if __name__ == "__main__":

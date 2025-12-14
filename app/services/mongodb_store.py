@@ -12,7 +12,8 @@ from pymongo.errors import ServerSelectionTimeoutError, ConnectionFailure
 
 from ..models.domain import Prompt
 from app.models.schemas import PredictResponse
-from app.core.logging import log_api_call
+from app.core.logging import log_service_call
+from app.core.context import request_id_var
 from app.core.config import settings
 from app.services.prompt_store import PromptStore
 from app.core.exceptions import PromptNotFoundError # Added import
@@ -23,7 +24,7 @@ Purpose: TypeAlias = str
 
 class MongoDBStore(PromptStore):
     """MongoDB-backed implementation of PromptStore interface."""
-
+    @log_service_call
     def __init__(self, mongodb_uri: Optional[str] = None):
         """Initialize MongoDB connection and setup collections.
 
@@ -92,6 +93,7 @@ class MongoDBStore(PromptStore):
             template=doc.get("template", ""), 
             version=doc.get("version", 1), 
             active=doc.get("active", False),
+            request_id=doc.get("request_id"),
         )
 
     def _prompt_to_doc(self, prompt: Prompt) -> dict:
@@ -103,9 +105,10 @@ class MongoDBStore(PromptStore):
             "template": prompt.template,
             "version": prompt.version,
             "active": prompt.active,
+            "request_id": prompt.request_id,
         }
-
-    @log_api_call
+    
+    @log_service_call
     async def create(self, purpose: Purpose, name: str, template: str) -> Prompt:
         """Create a new prompt.
 
@@ -124,13 +127,14 @@ class MongoDBStore(PromptStore):
             template=template,
             version=1,
             active=False,
+            request_id=request_id_var.get(),
         )
 
         doc = self._prompt_to_doc(prompt)
         await self.prompts_collection.insert_one(doc)
         return prompt
 
-    @log_api_call
+    @log_service_call
     async def list(self, purpose: Purpose | None = None) -> list[Prompt]:
         """List all prompts for a given purpose.
 
@@ -145,7 +149,7 @@ class MongoDBStore(PromptStore):
         docs = await cursor.to_list(length=None)
         return [self._doc_to_prompt(doc) for doc in docs] 
 
-    @log_api_call
+    @log_service_call
     async def get(self, prompt_id: PromptId) -> Prompt: # Changed return type to Prompt
         """Retrieve a prompt by ID.
 
@@ -163,7 +167,7 @@ class MongoDBStore(PromptStore):
             raise PromptNotFoundError(f"Prompt with ID {prompt_id} not found")
         return self._doc_to_prompt(doc)
 
-    @log_api_call
+    @log_service_call
     async def delete(self, prompt_id: PromptId) -> bool:
         """Delete a prompt by ID.
 
@@ -180,7 +184,7 @@ class MongoDBStore(PromptStore):
         result = await self.prompts_collection.delete_one({"_id": prompt_id})
         return result.deleted_count > 0
 
-    @log_api_call
+    @log_service_call
     async def patch(
         self, prompt_id: PromptId, name: str | None = None, template: str | None = None
     ) -> Prompt | None:
@@ -212,8 +216,8 @@ class MongoDBStore(PromptStore):
             return self._doc_to_prompt(result) if result else None
 
         return await self.get(prompt_id)
-
-    @log_api_call
+    
+    @log_service_call
     async def set_active(
         self, user_id: UserId, purpose: Purpose, prompt_id: PromptId
     ) -> Prompt | None:
@@ -252,8 +256,8 @@ class MongoDBStore(PromptStore):
         )
 
         return await self.get(prompt_id)
-
-    @log_api_call
+    
+    @log_service_call    
     async def get_active(self, user_id: UserId, purpose: Purpose) -> Prompt | None:
         """Retrieve the active prompt for a user and purpose.
 
@@ -273,7 +277,7 @@ class MongoDBStore(PromptStore):
 
         return await self.get(active_doc["prompt_id"])
 
-    @log_api_call
+    @log_service_call
     async def store_response(
         self, response: PredictResponse, user_id: str, purpose: str
     ) -> None:
@@ -297,7 +301,7 @@ class MongoDBStore(PromptStore):
 
         await self.responses_collection.insert_one(doc)
 
-    @log_api_call
+    @log_service_call
     async def get_history(
         self, limit: int = 50, purpose: Optional[str] = None, user_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
@@ -339,6 +343,7 @@ class MongoDBStore(PromptStore):
             )
         return results
     
+    @log_service_call
     async def _export_to_csv(self, output_path: str):
         """Export documents to CSV asynchronously."""
         # Fetch all documents asynchronously
@@ -381,8 +386,7 @@ class MongoDBStore(PromptStore):
         
         await asyncio.to_thread(write_csv)
 
-
-    @log_api_call
+    @log_service_call
     async def export_prompt_usage_logs(
         self, output_path: Optional[str] = None
     ) -> str:

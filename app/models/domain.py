@@ -1,4 +1,5 @@
 from dataclasses import dataclass, asdict, field
+from typing import Optional
 from jinja2 import Template
 
 
@@ -18,6 +19,7 @@ class Prompt:
     template: str | None
     version: int = 1
     active: bool = False
+    request_id: Optional[str] = None
 
     def update(self, template: str):
         """Update the prompt template and increment version.

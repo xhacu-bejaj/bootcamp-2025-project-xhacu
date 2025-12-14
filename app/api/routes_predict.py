@@ -6,6 +6,7 @@ from app.services.prompt_store import PromptStore
 from app.api.dependencies import get_store
 from app.services.mongodb_store import MongoDBStore
 from app.core.logging import setup_logging, log_api_call
+from app.core.context import request_id_var
 
 
 setup_logging()
@@ -34,4 +35,5 @@ async def predict_prompt(
         except Exception as e:
             print(f"Failed to store response: {e}")
 
+    post_process_doc.request_id = request_id_var.get()
     return post_process_doc

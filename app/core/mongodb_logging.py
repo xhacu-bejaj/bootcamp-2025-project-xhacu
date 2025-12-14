@@ -1,72 +1,79 @@
 import logging
+import asyncio
 from datetime import datetime, timezone
-from pymongo import MongoClient
+from motor.motor_asyncio import AsyncIOMotorClient
 from app.core.config import settings
+from app.core.context import request_id_var 
 
+class AsyncMongoDBHandler(logging.Handler):
+    """
+    Custom logging handler that writes logs to MongoDB asynchronously.
+    """
+    _client = None
+    _logs_col = None
 
-class MongoDBHandler(logging.Handler):
-    """Custom logging handler that writes logs to MongoDB."""
-
-    def __init__(
-        self, mongodb_uri: str, db_name: str = "data", collection_name: str = "logs"
-    ):
-        """Initialize MongoDB logging handler.
-        
-        Args:
-            mongodb_uri: MongoDB connection string
-            db_name: Database name (default: 'data')
-            collection_name: Collection name for logs (default: 'logs')
-            
-        Raises:
-            ValueError: If mongodb_uri is not provided
-        """
+    def __init__(self, mongodb_uri: str, db_name: str = "data", collection_name: str = "logs"):
         super().__init__()
-        uri = mongodb_uri or settings.MONGODB_URI
-        if not uri:
+        self.uri = mongodb_uri or settings.MONGODB_URI
+        self.db_name = db_name
+        self.collection_name = collection_name
+        if not self.uri:
             raise ValueError("MONGODB_URI must be provided or set in environment")
 
-        self.client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-        self.db = self.client[db_name]
-        self.logs_col = self.db[collection_name]
-
-        # Create index for timestamp for easy querying and TTL
-        try:
-            self.logs_col.create_index("timestamp")
-            self.logs_col.create_index([("level", 1), ("timestamp", -1)])
-        except Exception:
-            pass
+    def _get_collection(self):
+        """Lazily connect to MongoDB and return the collection."""
+        if self._logs_col is None:
+            try:
+                # Motor's client is safe to create in a sync context.
+                # It manages the I/O loop connection transparently.
+                self._client = AsyncIOMotorClient(self.uri, serverSelectionTimeoutMS=5000)
+                db = self._client[self.db_name]
+                self._logs_col = db[self.collection_name]
+            except Exception as e:
+                import sys
+                print(f"CRITICAL: Could not create MongoDB client for logging: {e}", file=sys.stderr)
+                # Return None to prevent further attempts on this handler instance
+                return None
+        return self._logs_col
 
     def emit(self, record):
-        """Write log record to MongoDB.
-        
-        Creates a document with timestamp, level, logger name, message,
-        and source code location. Includes exception info if present.
-        
-        Args:
-            record: LogRecord to write to MongoDB
         """
+        Format the log record and schedule its insertion on the event loop.
+        """
+        collection = self._get_collection()
+        if collection is None:
+            return # Connection failed previously, do nothing.
+
+        log_doc = {
+            "timestamp": datetime.now(timezone.utc),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+            "request_id": request_id_var.get("N/A")
+        }
+        if record.exc_info:
+            log_doc["exception"] = self.format(record)
+
+        async def do_insert():
+            try:
+                await collection.insert_one(log_doc)
+            except Exception as e:
+                import sys
+                print(f"Failed to write log to MongoDB: {e}", file=sys.stderr)
+
         try:
-            log_doc = {
-                "timestamp": datetime.now(timezone.utc),
-                "level": record.levelname,
-                "logger": record.name,
-                "message": record.getMessage(),
-                "module": record.module,
-                "function": record.funcName,
-                "line": record.lineno,
-                "path": record.pathname,
-            }
-
-            # Add exception info if present
-            if record.exc_info:
-                log_doc["exception"] = self.format(record)
-
-            self.logs_col.insert_one(log_doc)
-        except Exception:
-            # Silently fail if logging to MongoDB fails
-            self.handleError(record)
+            loop = asyncio.get_running_loop()
+            loop.create_task(do_insert())
+        except RuntimeError:
+            # This can happen if a log is emitted when no event loop is running.
+            # For a FastAPI app, this is unlikely for request-related logs.
+            pass
 
     def close(self):
         """Close MongoDB connection."""
-        self.client.close()
+        if self._client:
+            self._client.close()
         super().close()

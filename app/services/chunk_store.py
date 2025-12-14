@@ -8,19 +8,21 @@ text chunks from a vector database.
 import uuid
 from typing import List
 
-import chromadb
-from chromadb.config import Settings as ChromaSettings
-
 from app.core.config import settings
 from app.models.domain import Chunk
 from app.core.logging import log_api_call
+from app.services.vector_store import VectorStore
 
-# TODO : Add pagination support for retrieve_chunks if needed in future, and async
-class ChunkStore:
+
+class ChunkStore(VectorStore):
     """Service for storing and retrieving text chunks using ChromaDB."""
 
     def __init__(self):
         """Initialize the ChunkStore with ChromaDB client."""
+        # Import chromadb here to avoid module-level import issues
+        import chromadb
+        from chromadb.config import Settings as ChromaSettings
+        
         self._client = chromadb.PersistentClient(
             path=settings.CHROMA_PERSIST_DIR,
             settings=ChromaSettings(anonymized_telemetry=False)
@@ -30,13 +32,13 @@ class ChunkStore:
             metadata={"hnsw:space": "cosine"}  # do anns using cosine similarity
         )
 
-    async def initialize(self):
+    def initialize(self):
         """Asynchronously get or create the collection (no-op since initialized in __init__)."""
         # Collection already initialized in __init__ for ChromaDB 0.5.x
         pass
 
-    @log_api_call
-    async def insert_chunk(self, text: str, metadata: dict | None = None) -> Chunk:
+    
+    def insert_chunk(self, text: str, metadata: dict | None = None) -> Chunk:
         """
         Insert a text chunk into the vector database.
 
@@ -74,8 +76,50 @@ class ChunkStore:
 
         return Chunk(id=chunk_id, text=text, metadata=chunk_metadata)
 
-    @log_api_call
-    async def retrieve_chunks(self, query_text: str, n_chunks: int = 5) -> List[Chunk]:
+    def insert_chunks(self, texts: List[str], metadatas: List[dict]) -> List[Chunk]:
+        """
+        Insert multiple text chunks into the vector database in a single batch.
+
+        Args:
+            texts: A list of text content to store.
+            metadatas: A list of metadata dictionaries, one for each text.
+
+        Returns:
+            A list of Chunk objects with their generated IDs.
+
+        Raises:
+            ValueError: If the number of texts and metadatas don't match, or if any
+                        text exceeds the maximum chunk length.
+            RuntimeError: If the database insertion fails.
+        """
+        if len(texts) != len(metadatas):
+            raise ValueError("The number of texts and metadatas must be the same.")
+
+        chunk_ids = [str(uuid.uuid4()) for _ in texts]
+        processed_metadatas = []
+        for i, text in enumerate(texts):
+            if len(text) > settings.MAX_CHUNK_LENGTH:
+                raise ValueError(
+                    f"Chunk at index {i} exceeds maximum length of "
+                    f"{settings.MAX_CHUNK_LENGTH} characters. Got {len(text)} characters."
+                )
+            meta = metadatas[i] or {}
+            meta["length"] = len(text)
+            processed_metadatas.append(meta)
+
+        try:
+            self._collection.add(
+                ids=chunk_ids,
+                documents=texts,
+                metadatas=processed_metadatas
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to insert chunks into database: {str(e)}") from e
+
+        return [Chunk(id=chunk_ids[i], text=texts[i], metadata=processed_metadatas[i]) for i in range(len(texts))]
+
+    
+    def retrieve_chunks(self, query_text: str, n_chunks: int = 5) -> List[Chunk]:
         """
         Retrieve the most similar chunks to the query text.
 
@@ -129,7 +173,7 @@ class ChunkStore:
         except Exception as e:
             raise RuntimeError(f"Failed to retrieve chunks from database: {str(e)}") from e
 
-    async def count(self) -> int:
+    def count(self) -> int:
         """
         Get the total number of chunks in the database.
 
@@ -138,7 +182,7 @@ class ChunkStore:
         """
         return self._collection.count()
 
-    async def clear(self) -> None:
+    def clear(self) -> None:
         """
         Clear all chunks from the database.
 

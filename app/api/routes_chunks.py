@@ -13,6 +13,7 @@ from app.models.schemas import ChunkInsert, ChunkResponse, ChunkMetadata
 from app.services.chunk_store import ChunkStore
 from app.api.dependencies import get_chunk_store
 from app.core.logging import log_api_call, API_LOGGER
+from app.core.context import request_id_var
 
 chunk_router = APIRouter(prefix="/v1/chunks", tags=["chunks"])
 
@@ -29,7 +30,7 @@ chunk_router = APIRouter(prefix="/v1/chunks", tags=["chunks"])
     }
 )
 @log_api_call
-async def insert_chunk(
+def insert_chunk(
     chunk_data: ChunkInsert, store: ChunkStore = Depends(get_chunk_store)
 ) -> ChunkResponse:
     """
@@ -49,7 +50,7 @@ async def insert_chunk(
                 "position": chunk_data.metadata.position
             }
         
-        chunk = await store.insert_chunk(
+        chunk = store.insert_chunk(
             text=chunk_data.text,
             metadata=metadata_dict
         )
@@ -62,7 +63,8 @@ async def insert_chunk(
                 source=chunk.metadata.get("source"),
                 position=chunk.metadata.get("position")
             ),
-            distance=None
+            distance=None,
+            request_id=request_id_var.get()
         )
 
     except ValueError as e:
@@ -98,7 +100,7 @@ async def insert_chunk(
     }
 )
 @log_api_call
-async def retrieve_chunks(
+def retrieve_chunks(
     text: str, n_chunks: int = 5, store: ChunkStore = Depends(get_chunk_store)
 ) -> List[ChunkResponse]:
     """
@@ -122,8 +124,9 @@ async def retrieve_chunks(
         if n_chunks < 1 or n_chunks > 100: # magic numbers no good
             raise ValueError("n_chunks must be between 1 and 100")
 
-        chunks = await store.retrieve_chunks(query_text=text, n_chunks=n_chunks)
+        chunks = store.retrieve_chunks(query_text=text, n_chunks=n_chunks)
 
+        request_id = request_id_var.get()
         return [
             ChunkResponse(
                 id=chunk.id,
@@ -133,7 +136,8 @@ async def retrieve_chunks(
                     source=chunk.metadata.get("source"),
                     position=chunk.metadata.get("position")
                 ),
-                distance=chunk.metadata.get('distance')
+                distance=chunk.metadata.get('distance'),
+                request_id=request_id
             )
             for chunk in chunks
         ]
