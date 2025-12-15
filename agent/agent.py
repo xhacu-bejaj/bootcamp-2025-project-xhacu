@@ -7,7 +7,7 @@ from google.adk.agents.llm_agent import Agent
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from app.context import app_context
+from app.app_context import app_context
 from app.services.chunk_store import ChunkStore 
 
 if not app_context.chunk_store:

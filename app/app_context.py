@@ -1,5 +1,4 @@
 from typing import Optional
-from contextvars import ContextVar
 
 from app.services.chunk_store import ChunkStore
 

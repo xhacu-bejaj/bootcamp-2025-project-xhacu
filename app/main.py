@@ -31,13 +31,13 @@ from app.core.exceptions import (
 )
 from app.core.config import settings
 from app.core.logging import setup_logging
-from app.context import app_context
+from app.app_context import app_context
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan - startup and shutdown events."""
-    # Startup
+    
     if settings.FILE_SNAPSHOT:
         prompt_store = FileSnapshotStore()
     else:
@@ -59,13 +59,13 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    # Shutdown: close MongoDB connection if applicable
     if isinstance(app.state.prompt_store, MongoDBStore):
         await app.state.prompt_store.close()
 
 
 from app.core.middleware import add_request_id_middleware
 app = FastAPI(title="Prompted Doc Processor", version="0.1.0", lifespan=lifespan)
+
 app.middleware("http")(add_request_id_middleware)
 
 app.add_exception_handler(HTTPException, http_exception_handler) # type: ignore
