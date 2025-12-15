@@ -7,15 +7,6 @@ starlette~=0.50
 pydantic~=2.12
 pydantic-settings~=2.12
 
-# Database
-sqlalchemy~=2.0
-sqlmodel~=0.0.27
-alembic~=1.17
-aiosqlite~=0.21
-asyncpg~=0.31
-psycopg~=3.3
-psycopg-binary~=3.3
-
 # MongoDB
 pymongo~=4.15
 motor~=3.5

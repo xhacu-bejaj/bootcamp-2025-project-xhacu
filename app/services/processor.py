@@ -54,7 +54,7 @@ async def process_document(
             f"No active prompt with a valid template found for user: {user_id}, purpose: {purpose}"
         )
 
-    prompt = active_prompt.render({"text": document_text})
+    prompt = active_prompt.render({"document_text": document_text})
 
     try:
         llm_client: LLMClient = LLMClientFactory().create_client(provider)

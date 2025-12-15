@@ -80,6 +80,11 @@ class ChunkInsert(BaseModel):
     metadata: Optional[ChunkMetadataInput] = Field(None, description="Metadata associated with the chunk")
 
 
+class ChunkInsertBatch(BaseModel):
+    """Schema for inserting a batch of chunks."""
+    chunks: List[ChunkInsert]
+
+
 class ChunkResponse(BaseModel):
     """Schema for chunk retrieval response."""
     id: str = Field(..., description="Unique identifier for the chunk")

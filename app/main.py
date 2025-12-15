@@ -78,14 +78,12 @@ setup_logging()
 
 from app.api.routes_prompts import prompt_router  # noqa: E402
 from app.api.routes_predict import predict_router  # noqa: E402
-from app.api.routes_db import db_router  # noqa: E402
 from app.api.routes_history import history_router  # noqa: E402
 from app.api.routes_chunks import chunk_router  # noqa: E402
 from app.api.routes_agent import agent_router  # noqa: E402
 
 app.include_router(prompt_router)
 app.include_router(predict_router)
-app.include_router(db_router)
 app.include_router(history_router)
 app.include_router(chunk_router)
 app.include_router(agent_router)

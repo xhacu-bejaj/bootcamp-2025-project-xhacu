@@ -17,8 +17,18 @@ class MockLLM(LLMClient):
         end_time = time.perf_counter()
         latency_ms = int((end_time - start_time) * 1000)
 
+        # Start with default model info
+        model_info = LLMParams(model="mock", temperature=0.5)
+
+        # If custom params are provided, update the model_info
+        if params:
+            if params.model:
+                model_info.model = params.model
+            if params.temperature is not None:
+                model_info.temperature = params.temperature
+
         return LLMOutput(
             output_text=mock_output,
-            model_info=LLMParams(model="mock", temperature=0.5),
+            model_info=model_info,
             latency_ms=latency_ms,
         )

@@ -13,8 +13,8 @@ from app.core.config import settings # Import the settings object
 
 
 
-@pytest_asyncio.fixture
-async def real_chunk_store():
+@pytest.fixture
+def real_chunk_store():
     """
     Provide a real ChromaDB connection for integration tests.
     
@@ -28,7 +28,7 @@ async def real_chunk_store():
     finally:
         # Cleanup: clear the collection after test
         try:
-            await store.clear()
+            store.clear()
         except Exception:
             pass  # Best effort cleanup
 

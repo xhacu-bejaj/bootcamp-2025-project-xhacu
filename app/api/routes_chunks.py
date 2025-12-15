@@ -9,7 +9,7 @@ This module provides endpoints for:
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List
 
-from app.models.schemas import ChunkInsert, ChunkResponse, ChunkMetadata
+from app.models.schemas import ChunkInsert, ChunkResponse, ChunkMetadata, ChunkInsertBatch
 from app.services.chunk_store import ChunkStore
 from app.api.dependencies import get_chunk_store
 from app.core.logging import log_api_call, API_LOGGER
@@ -86,6 +86,60 @@ def insert_chunk(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during chunk insertion"
+        ) from e
+
+
+@chunk_router.post(
+    "/insert_batch",
+    response_model=List[ChunkResponse],
+    status_code=status.HTTP_201_CREATED,
+    summary="Insert a batch of chunks into the vector database",
+)
+@log_api_call
+def insert_chunk_batch(
+    batch_data: "ChunkInsertBatch", store: ChunkStore = Depends(get_chunk_store)
+) -> List[ChunkResponse]:
+    """
+    Insert a batch of text chunks into the vector database.
+    """
+    try:
+        texts = [chunk.text for chunk in batch_data.chunks]
+        metadatas = []
+        for chunk in batch_data.chunks:
+            if chunk.metadata:
+                # Filter out None values from the metadata dictionary
+                meta_dict = {k: v for k, v in chunk.metadata.model_dump().items() if v is not None}
+                metadatas.append(meta_dict)
+            else:
+                metadatas.append({})
+
+        inserted_chunks = store.insert_chunks(texts=texts, metadatas=metadatas)
+
+        request_id = request_id_var.get()
+        return [
+            ChunkResponse(
+                id=chunk.id,
+                text=chunk.text,
+                metadata=ChunkMetadata(
+                    length=chunk.metadata.get("length", 0),
+                    source=chunk.metadata.get("source"),
+                    position=chunk.metadata.get("position")
+                ),
+                distance=None,
+                request_id=request_id
+            ) for chunk in inserted_chunks
+        ]
+    except ValueError as e:
+        API_LOGGER.error(f"[insert_chunk_batch] Validation error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        ) from e
+    except RuntimeError as e:
+        API_LOGGER.error(f"[insert_chunk_batch] Database error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to insert chunk batch: {str(e)}"
         ) from e
 
 
