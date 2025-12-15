@@ -10,7 +10,6 @@ from typing import List
 
 from app.core.config import settings
 from app.models.domain import Chunk
-from app.core.logging import log_api_call
 from app.services.vector_store import VectorStore
 
 

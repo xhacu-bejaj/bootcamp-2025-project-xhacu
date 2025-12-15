@@ -8,7 +8,9 @@ Sets up FastAPI application with:
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.exceptions import HTTPException
+
 import uvicorn
+
 
 from app.services.prompt_store import FileSnapshotStore, InMemoryStore
 from app.services.mongodb_store import MongoDBStore
@@ -21,23 +23,21 @@ from app.core.errors import (
     database_error_handler,
     configuration_error_handler,
 )
-
 from app.core.exceptions import (
     PromptNotFoundError,
     LLMGenerationError,
     DatabaseError,
     ConfigurationError,
 )
-
 from app.core.config import settings
 from app.core.logging import setup_logging
-from app.core.context import app_context
+from app.context import app_context
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan - startup and shutdown events."""
-    prompt_store = None 
+    # Startup
     if settings.FILE_SNAPSHOT:
         prompt_store = FileSnapshotStore()
     else:
@@ -46,24 +46,25 @@ async def lifespan(app: FastAPI):
             try:
                 prompt_store = MongoDBStore(mongodb_uri=mongodb_uri)
                 await prompt_store.initialize()
-            except Exception as e:
+            except Exception:
                 prompt_store = InMemoryStore()
         else:
             prompt_store = InMemoryStore()
     
-    if prompt_store:
-        app.state.prompt_store = prompt_store
+    app.state.prompt_store = prompt_store
 
     chunk_store = ChunkStore()
-
-    chunk_store.initialize() 
+    chunk_store.initialize()
     app_context.chunk_store = chunk_store
+    
     yield
     
+    # Shutdown: close MongoDB connection if applicable
     if isinstance(app.state.prompt_store, MongoDBStore):
         await app.state.prompt_store.close()
 
-from app.core.middleware import add_request_id_middleware
+
+from app.middleware import add_request_id_middleware
 app = FastAPI(title="Prompted Doc Processor", version="0.1.0", lifespan=lifespan)
 app.middleware("http")(add_request_id_middleware)
 
@@ -73,7 +74,6 @@ app.add_exception_handler(LLMGenerationError, llm_generation_handler) # type: ig
 app.add_exception_handler(DatabaseError, database_error_handler) # type: ignore
 app.add_exception_handler(ConfigurationError, configuration_error_handler) # type: ignore
 app.add_exception_handler(Exception, generic_exception_handler)
-
 setup_logging()
 
 from app.api.routes_prompts import prompt_router  # noqa: E402
