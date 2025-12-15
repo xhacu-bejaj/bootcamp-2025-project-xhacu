@@ -31,13 +31,12 @@ class GoogleLLM(LLMClient):
     @log_api_call 
     async def generate(self, prompt: str, params:Optional[LLMParams] = None) -> LLMOutput | None:
 
-        # Determine the actual temperature to use
         actual_temperature = params.temperature if params and params.temperature is not None else self.temperature
         
         config_params = {
             "temperature": actual_temperature,
             "response_mime_type": "application/json",
-            "response_schema": OutputSchema.model_json_schema(), # Ensures output conforms to OutputSchema
+            "response_schema": OutputSchema.model_json_schema(), 
         }
 
         try:

@@ -11,7 +11,6 @@ from app.core.context import request_id_var
 
 history_router = APIRouter(prefix="/v1", tags=["history"])
 
-
 @history_router.get("/history", response_model=List[HistoryItem])
 @log_api_call
 async def get_history(

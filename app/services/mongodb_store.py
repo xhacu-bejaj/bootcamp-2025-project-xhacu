@@ -150,7 +150,7 @@ class MongoDBStore(PromptStore):
         return [self._doc_to_prompt(doc) for doc in docs] 
 
     @log_service_call
-    async def get(self, prompt_id: PromptId) -> Prompt: # Changed return type to Prompt
+    async def get(self, prompt_id: PromptId) -> Prompt:
         """Retrieve a prompt by ID.
 
         Args:
@@ -177,10 +177,8 @@ class MongoDBStore(PromptStore):
         Returns:
             True if the prompt was deleted, False otherwise.
         """
-        # First, find and potentially remove any active mappings for this prompt
+        
         await self.active_prompts_collection.delete_many({"prompt_id": prompt_id})
-
-        # Then, delete the prompt itself
         result = await self.prompts_collection.delete_one({"_id": prompt_id})
         return result.deleted_count > 0
 
@@ -346,7 +344,7 @@ class MongoDBStore(PromptStore):
     @log_service_call
     async def _export_to_csv(self, output_path: str):
         """Export documents to CSV asynchronously."""
-        # Fetch all documents asynchronously
+
         cursor = self.responses_collection.find().sort("timestamp", -1)
         documents = await cursor.to_list(length=None)
 
@@ -359,7 +357,6 @@ class MongoDBStore(PromptStore):
             "model_info",
         ]
         
-        # Write to file in thread pool to avoid blocking
         def write_csv():
             try:
                 with open(output_path, "w", newline="", encoding="utf-8") as csvfile:

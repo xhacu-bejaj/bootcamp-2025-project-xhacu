@@ -13,15 +13,10 @@ from app.core.config import settings
 try:
     from nltk.tokenize import sent_tokenize
 except ImportError:
-    print("NLTK not found. Please install it: pip install nltk")
-    # Provide a fallback or raise an error
     def sent_tokenize(text: str) -> List[str]:
-        # Simple regex-based sentence tokenizer as a fallback
         import re
         sentence_pattern = re.compile(r'(?<=[.!?])\s+(?=[A-Z])')
         return sentence_pattern.split(text)
-
-
 
 class ChunkingStrategy(ABC):
     """Abstract base class for text chunking strategies."""
@@ -223,20 +218,13 @@ class PhraseChunkingStrategy(ChunkingStrategy):
 
         return chunks
 
-
-
-
 try:
     from nltk.tokenize import sent_tokenize
 except ImportError:
-    print("NLTK not found. Please install it: pip install nltk")
-    # Provide a fallback or raise an error
     def sent_tokenize(text: str) -> List[str]:
-        # Simple regex-based sentence tokenizer as a fallback
         import re
         sentence_pattern = re.compile(r'(?<=[.!?])\s+(?=[A-Z])')
         return sentence_pattern.split(text)
-
 
 class SemanticChunkingStrategy(ChunkingStrategy):
     """
@@ -308,7 +296,6 @@ class SemanticChunkingStrategy(ChunkingStrategy):
         current_chunk = ""
         for word in words:
             if len(word) > self.max_length:
-                # If a single word is too long, we have to split it.
                 if current_chunk:
                     chunks.append(current_chunk)
                 

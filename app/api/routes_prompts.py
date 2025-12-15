@@ -8,17 +8,14 @@ from app.api.dependencies import get_store
 from app.core.logging import setup_logging, log_api_call
 from app.core.context import request_id_var
 
-
 setup_logging()
 
 prompt_router = APIRouter(prefix="/v1")
-
 
 @prompt_router.get("/health")
 @log_api_call
 def health():
     return {"status": "ok", "request_id": request_id_var.get()}
-
 
 @prompt_router.post("/prompts", response_model=PromptRead)
 @log_api_call
@@ -26,12 +23,11 @@ async def create_prompt(
     data: PromptCreate,
     x_user_id: str = Header(default="user_anon"),
     store: PromptStore = Depends(get_store),
-):  # ->PromptRead:
+): 
     new_prompt = await store.create(
         purpose=data.purpose, name=data.name, template=data.template
     )
     return {**new_prompt.__dict__, "request_id": request_id_var.get()}
-
 
 @prompt_router.get("/prompts/{purpose}", response_model=list[PromptRead])
 @log_api_call
@@ -41,7 +37,6 @@ async def list_prompts(
     store: PromptStore = Depends(get_store),
 ):
     prompts_list = await store.list(purpose)
-    # Convert Prompt dataclass objects to dictionaries for Pydantic serialization
     return [
         {
             **p.__dict__,
@@ -49,7 +44,6 @@ async def list_prompts(
         }
         for p in prompts_list
     ]
-
 
 @prompt_router.patch("/prompts/{prompt_id}", response_model=PromptRead)
 @log_api_call
@@ -59,7 +53,6 @@ async def patch_prompt(
     x_user_id: str = Header(default="user_anon"),
     store: PromptStore = Depends(get_store),
 ):
-    # Only pass non-None values to patch
     kwargs = {}
     if data.name is not None:
         kwargs["name"] = data.name
@@ -70,7 +63,6 @@ async def patch_prompt(
     if patched_prompt:
         return {**patched_prompt.__dict__, "request_id": request_id_var.get()}
     return None
-
 
 @prompt_router.post("/prompts/{prompt_id}/activate")
 @log_api_call
@@ -87,7 +79,6 @@ async def activate_prompt(
         return {**active_prompt.__dict__, "request_id": request_id_var.get()}
     return None
 
-
 @prompt_router.get("/get_active/{purpose}")
 @log_api_call
 async def get_active(
@@ -97,7 +88,6 @@ async def get_active(
     if active_prompt:
         return {**active_prompt.__dict__, "request_id": request_id_var.get()}
     return None
-
 
 @prompt_router.post("/prompts/export")
 @log_api_call
@@ -113,7 +103,7 @@ async def export_prompt_logs(
     Returns:
         dict with export_path and total_records exported
     """
-    # Check if using MongoDB store
+
     if not isinstance(store, MongoDBStore):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

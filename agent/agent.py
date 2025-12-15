@@ -1,14 +1,9 @@
 from datetime import datetime
-from google.adk.agents.llm_agent import Agent
-import asyncio
 import sys
-import os
 from pathlib import Path
 
-# TODO: real db, structured output, handle more complex queries
-# x-user-id header to track users
+from google.adk.agents.llm_agent import Agent
 
-# Add project root to path to import app modules
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -16,12 +11,8 @@ from app.core.context import app_context
 from app.core.config import settings
 from app.services.chunk_store import ChunkStore # Import ChunkStore
 
-# Initialize ChunkStore here for the agent's tools to use
-# In a full application, this would be handled by the app startup.
-# For standalone agent testing, this ensures the tool has access to the store.
 if not app_context.chunk_store:
     app_context.chunk_store = ChunkStore()
-
 
 def get_datetime() -> str:
     """Get the current date and time.
@@ -50,7 +41,6 @@ def search_knowledge_base(query: str, n_results: int = 5) -> str:
     n_results = max(1, min(n_results, 20))
     
     try:
-        # Use the shared chunk_store instance from the app context
         if not app_context.chunk_store:
             return "Error: ChunkStore not initialized."
 
@@ -59,14 +49,12 @@ def search_knowledge_base(query: str, n_results: int = 5) -> str:
         if not chunks:
             return "No relevant information found in the knowledge base."
         
-        # Format the results
         result_parts = [f"Found {len(chunks)} relevant chunks:\n"]
         for i, chunk in enumerate(chunks, 1):
             distance = chunk.metadata.get('distance', 'N/A')
             result_parts.append(f"\n--- Chunk {i} (similarity: {distance}) ---")
             result_parts.append(chunk.text)
             
-            # Add metadata if available (excluding distance which we already showed)
             other_metadata = {k: v for k, v in chunk.metadata.items() if k != 'distance'}
             if other_metadata:
                 result_parts.append(f"Metadata: {other_metadata}")
@@ -75,9 +63,6 @@ def search_knowledge_base(query: str, n_results: int = 5) -> str:
         
     except Exception as e:
         return f"Error searching knowledge base: {str(e)}"
-
-
-
 
 root_agent = Agent(
     model='gemini-2.5-flash',

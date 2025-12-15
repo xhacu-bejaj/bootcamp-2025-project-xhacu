@@ -8,10 +8,9 @@ from app.services.mongodb_store import MongoDBStore
 from app.core.logging import setup_logging, log_api_call
 from app.core.context import request_id_var
 
-
 setup_logging()
-predict_router = APIRouter(prefix="/v1")
 
+predict_router = APIRouter(prefix="/v1")
 
 @predict_router.post("/predict", response_model=PredictResponse)
 @log_api_call
@@ -28,7 +27,6 @@ async def predict_prompt(
         store, x_user_id, purpose, document_text, provider, params=req.params
     )
 
-    # Store response only if using MongoDB store
     if isinstance(store, MongoDBStore):
         try:
             await store.store_response(post_process_doc, x_user_id, purpose)

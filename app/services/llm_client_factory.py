@@ -7,9 +7,7 @@ from app.core.logging import setup_logging, log_api_call
 
 setup_logging()
 
-
 PROVIDERS = {"mock": MockLLM, "openai": OpenaiLLM, "google": GoogleLLM}
-
 
 class LLMClientFactory:
     @staticmethod

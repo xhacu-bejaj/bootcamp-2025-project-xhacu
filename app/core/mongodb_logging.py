@@ -24,15 +24,12 @@ class AsyncMongoDBHandler(logging.Handler):
         """Lazily connect to MongoDB and return the collection."""
         if self._logs_col is None:
             try:
-                # Motor's client is safe to create in a sync context.
-                # It manages the I/O loop connection transparently.
                 self._client = AsyncIOMotorClient(self.uri, serverSelectionTimeoutMS=5000)
                 db = self._client[self.db_name]
                 self._logs_col = db[self.collection_name]
             except Exception as e:
                 import sys
                 print(f"CRITICAL: Could not create MongoDB client for logging: {e}", file=sys.stderr)
-                # Return None to prevent further attempts on this handler instance
                 return None
         return self._logs_col
 
@@ -42,7 +39,7 @@ class AsyncMongoDBHandler(logging.Handler):
         """
         collection = self._get_collection()
         if collection is None:
-            return # Connection failed previously, do nothing.
+            return 
 
         log_doc = {
             "timestamp": datetime.now(timezone.utc),
@@ -68,8 +65,6 @@ class AsyncMongoDBHandler(logging.Handler):
             loop = asyncio.get_running_loop()
             loop.create_task(do_insert())
         except RuntimeError:
-            # This can happen if a log is emitted when no event loop is running.
-            # For a FastAPI app, this is unlikely for request-related logs.
             pass
 
     def close(self):

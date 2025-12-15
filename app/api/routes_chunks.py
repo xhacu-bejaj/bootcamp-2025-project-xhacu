@@ -17,7 +17,6 @@ from app.core.context import request_id_var
 
 chunk_router = APIRouter(prefix="/v1/chunks", tags=["chunks"])
 
-
 @chunk_router.post(
     "/insert",
     response_model=ChunkResponse,
@@ -29,6 +28,7 @@ chunk_router = APIRouter(prefix="/v1/chunks", tags=["chunks"])
         500: {"description": "Database insertion failed"}
     }
 )
+
 @log_api_call
 def insert_chunk(
     chunk_data: ChunkInsert, store: ChunkStore = Depends(get_chunk_store)
@@ -88,13 +88,13 @@ def insert_chunk(
             detail="Internal server error during chunk insertion"
         ) from e
 
-
 @chunk_router.post(
     "/insert_batch",
     response_model=List[ChunkResponse],
     status_code=status.HTTP_201_CREATED,
     summary="Insert a batch of chunks into the vector database",
 )
+
 @log_api_call
 def insert_chunk_batch(
     batch_data: "ChunkInsertBatch", store: ChunkStore = Depends(get_chunk_store)
@@ -107,7 +107,6 @@ def insert_chunk_batch(
         metadatas = []
         for chunk in batch_data.chunks:
             if chunk.metadata:
-                # Filter out None values from the metadata dictionary
                 meta_dict = {k: v for k, v in chunk.metadata.model_dump().items() if v is not None}
                 metadatas.append(meta_dict)
             else:
@@ -142,7 +141,6 @@ def insert_chunk_batch(
             detail=f"Failed to insert chunk batch: {str(e)}"
         ) from e
 
-
 @chunk_router.get(
     "/retrieve",
     response_model=List[ChunkResponse],
@@ -153,6 +151,7 @@ def insert_chunk_batch(
         500: {"description": "Database query failed"}
     }
 )
+
 @log_api_call
 def retrieve_chunks(
     text: str, n_chunks: int = 5, store: ChunkStore = Depends(get_chunk_store)

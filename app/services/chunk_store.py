@@ -19,7 +19,6 @@ class ChunkStore(VectorStore):
 
     def __init__(self):
         """Initialize the ChunkStore with ChromaDB client."""
-        # Import chromadb here to avoid module-level import issues
         import chromadb
         from chromadb.config import Settings as ChromaSettings
         
@@ -29,12 +28,11 @@ class ChunkStore(VectorStore):
         )
         self._collection = self._client.get_or_create_collection(
             name=settings.CHROMA_COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"}  # do anns using cosine similarity
+            metadata={"hnsw:space": "cosine"} 
         )
 
     def initialize(self):
         """Asynchronously get or create the collection (no-op since initialized in __init__)."""
-        # Collection already initialized in __init__ for ChromaDB 0.5.x
         pass
 
     

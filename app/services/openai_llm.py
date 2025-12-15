@@ -28,7 +28,7 @@ class OpenaiLLM(LLMClient):
 
     @log_api_call
     async def generate(self, prompt: str, params: Optional[LLMParams] = None) -> LLMOutput | None:
-        # Determine actual temperature to use
+        
         actual_temperature = params.temperature if params and params.temperature is not None else self.temperature
 
         json_instruction = (

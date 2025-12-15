@@ -169,7 +169,6 @@ class FileSnapshotStore(InMemoryStore):
                     for entry in data.get("active_prompts", [])
                 }
             except (json.JSONDecodeError, KeyError, IOError, OSError) as e:
-                # If file is corrupted or unreadable, start with empty state
                 print(f"Warning: Could not load {self.filepath}: {e}. Starting with empty state.")
                 self._prompts = []
                 self._active_prompts = {}
@@ -184,9 +183,8 @@ class FileSnapshotStore(InMemoryStore):
             IOError: If file cannot be written
         """
         try:
-            # Create parent directory if filepath includes a directory
             dir_path = os.path.dirname(self.filepath)
-            if dir_path:  # Only create if there's a directory component
+            if dir_path: 
                 os.makedirs(dir_path, exist_ok=True)
 
             data = {

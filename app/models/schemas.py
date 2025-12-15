@@ -7,7 +7,6 @@ class PromptCreate(BaseModel):
     name: str
     template: str
 
-
 class PromptRead(BaseModel):
     id: str
     purpose: str
@@ -17,12 +16,10 @@ class PromptRead(BaseModel):
     active: bool
     request_id: Optional[str] = None
 
-
 class PromptPatch(BaseModel):
     name: Optional[str] = None
     template: Optional[str] = None
 
-# TODO: make all fields optional, decide whether to keep model field
 class LLMParams(BaseModel):
     model: str 
     temperature: float
@@ -31,7 +28,7 @@ class LLMParams(BaseModel):
 class PredictRequest(BaseModel):
     purpose: str
     document_text: str
-    params: Optional[LLMParams] = None  # explain why LLMParams 
+    params: Optional[LLMParams] = None  
     provider: str = "google"
 
 class PredictResponse(BaseModel):
@@ -132,7 +129,6 @@ class TraceEventFinalResponse(BaseModel):
     content: str = Field(..., description="A chunk of the final response text.")
 
 TraceEvent = Union[TraceEventThought, TraceEventToolCall, TraceEventToolOutput, TraceEventFinalResponse]
-
 
 class AgentResponse(BaseModel):
     """Response model for agent interaction."""
