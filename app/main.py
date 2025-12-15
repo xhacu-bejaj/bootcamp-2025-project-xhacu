@@ -8,9 +8,7 @@ Sets up FastAPI application with:
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.exceptions import HTTPException
-
 import uvicorn
-
 
 from app.services.prompt_store import FileSnapshotStore, InMemoryStore
 from app.services.mongodb_store import MongoDBStore
@@ -23,12 +21,14 @@ from app.core.errors import (
     database_error_handler,
     configuration_error_handler,
 )
+
 from app.core.exceptions import (
     PromptNotFoundError,
     LLMGenerationError,
     DatabaseError,
     ConfigurationError,
 )
+
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.context import app_context
