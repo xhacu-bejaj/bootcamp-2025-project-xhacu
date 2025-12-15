@@ -16,4 +16,6 @@ def get_chunk_store() -> ChunkStore:
     """
     Dependency to get the shared chunk store instance from the app context.
     """
+    if app_context.chunk_store is None:
+        raise RuntimeError("ChunkStore has not been initialized.")
     return app_context.chunk_store
