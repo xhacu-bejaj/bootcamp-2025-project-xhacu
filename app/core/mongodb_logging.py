@@ -64,7 +64,7 @@ class AsyncMongoDBHandler(logging.Handler):
             loop = asyncio.get_running_loop()
             loop.create_task(do_insert())
         except RuntimeError:
-            pass
+            raise RuntimeError("No running event loop; cannot log to MongoDB asynchronously.")
 
     def close(self):
         """Close MongoDB connection."""
