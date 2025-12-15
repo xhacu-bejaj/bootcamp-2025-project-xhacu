@@ -21,7 +21,6 @@ class AsyncMongoDBHandler(logging.Handler):
             raise ValueError("MONGODB_URI must be provided or set in environment")
 
     def _get_collection(self):
-        """Lazily connect to MongoDB and return the collection."""
         if self._logs_col is None:
             try:
                 self._client = AsyncIOMotorClient(self.uri, serverSelectionTimeoutMS=5000)

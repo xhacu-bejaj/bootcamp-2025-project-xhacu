@@ -131,7 +131,7 @@ class ChunkStore(VectorStore):
             ValueError: If n_chunks is invalid
             RuntimeError: If database query fails
         """
-        if n_chunks < 1: # magic number no good
+        if n_chunks < 1: 
             raise ValueError("n_chunks must be at least 1")
 
         if n_chunks > 100: # magic number no good
