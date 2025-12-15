@@ -60,6 +60,7 @@ async def query_agent(
     existing_session = await session_service.get_session(
         app_name="knowledge_base_agent", user_id=user_id, session_id=session_id
     )
+    
     if not existing_session:
         await session_service.create_session(app_name="knowledge_base_agent", user_id=user_id, session_id=session_id)
     
