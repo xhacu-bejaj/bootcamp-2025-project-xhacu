@@ -2,7 +2,7 @@ from fastapi import Request
 
 from app.services.prompt_store import PromptStore
 from app.services.chunk_store import ChunkStore
-from app.context import app_context
+from app.core.context import app_context
 
 
 def get_store(request: Request) -> PromptStore:

@@ -12,7 +12,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from app.context import app_context
+from app.core.context import app_context
 from app.core.config import settings
 from app.services.chunk_store import ChunkStore # Import ChunkStore
 

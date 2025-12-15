@@ -4,7 +4,7 @@ Tests for the chunks API endpoints.
 
 import pytest
 from httpx import AsyncClient
-from app.context import app_context
+from app.core.context import app_context
 from app.services.chunk_store import ChunkStore
 from app.core.config import settings
 
