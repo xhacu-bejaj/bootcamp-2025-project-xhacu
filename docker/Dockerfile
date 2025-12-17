@@ -5,6 +5,7 @@ FROM python:3.12-slim as builder
 WORKDIR /app
 
 # Install system dependencies
+# (gcc is good to keep for building certain python wheels)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
@@ -12,6 +13,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
+
+# --- NEW: Download NLTK Data ---
+# We download the data to a specific folder in the builder stage
+RUN python -m nltk.downloader -d /app/nltk_data punkt punkt_tab
 
 
 # Final stage
@@ -28,14 +33,21 @@ RUN useradd -m -u 1000 appuser && \
 # Copy Python dependencies from builder
 COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
 
+# --- NEW: Copy NLTK Data from builder ---
+# We place it in the user's home directory where NLTK looks by default
+COPY --from=builder --chown=appuser:appuser /app/nltk_data /home/appuser/nltk_data
+
 # Copy application code
 COPY --chown=appuser:appuser app ./app
-COPY --chown=appuser:appuser var ./var
+# Only copy local var contents if you have default config files there
+#COPY --chown=appuser:appuser var ./var
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH=/home/appuser/.local/bin:$PATH
+    PATH=/home/appuser/.local/bin:$PATH \
+    # Explicitly tell NLTK where to look (just to be safe)
+    NLTK_DATA=/home/appuser/nltk_data
 
 # Switch to non-root user
 USER appuser
@@ -44,6 +56,7 @@ USER appuser
 EXPOSE 8080
 
 # Health check
+# (Uses 'requests' which is in your requirements.txt)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8080/health', timeout=5)"
 
